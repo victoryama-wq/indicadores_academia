@@ -1,0 +1,133 @@
+<section class="panel record-panel" id="estudiantes" aria-labelledby="students-title">
+  <div class="panel-heading">
+    <div>
+      <span class="eyebrow">DETALLE QUE EXPLICA EL INDICADOR</span>
+      <h2 id="students-title">Estudiantes · {{ labels[nav.state()] }}</h2>
+      <p aria-live="polite" data-testid="record-summary">
+        {{ filtered().length }} registros · {{ overdue() }} vencidos · {{ within() }} en plazo
+      </p>
+    </div>
+    @if (nav.canPreview()) {
+      <button type="button" mat-stroked-button (click)="preview()">
+        Vista previa de exportación
+      </button>
+    }
+  </div>
+  <div class="list-filters grid grid-cols-1 md:grid-cols-2 gap-3">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic"
+      ><mat-label>Buscar estudiante o matrícula</mat-label
+      ><input
+        matInput
+        #studentSearchInput
+        [value]="search()"
+        (input)="setSearch(studentSearchInput.value)"
+        placeholder="Ej. Estudiante Demo 019"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic"
+      ><mat-label>Estado del registro</mat-label
+      ><mat-select [value]="nav.state()" (selectionChange)="stateChange($event.value)">
+        @for (option of states; track option.value) {
+          <mat-option [value]="option.value">{{ option.label }}</mat-option>
+        }
+      </mat-select></mat-form-field
+    >
+  </div>
+  <div
+    class="table-scroll overflow-x-auto"
+    tabindex="0"
+    role="region"
+    aria-label="Tabla: Registros de seguimiento"
+  >
+    <table
+      mat-table
+      [dataSource]="page()"
+      matSort
+      matSortActive="student"
+      [matSortDirection]="nav.params()['orden'] === 'desc' ? 'desc' : 'asc'"
+      matSortDisableClear
+      (matSortChange)="sort($event)"
+      class="responsive-table"
+      aria-label="Registros de seguimiento"
+    >
+      <ng-container matColumnDef="student"
+        ><th scope="col" mat-header-cell *matHeaderCellDef mat-sort-header>
+          Estudiante / matrícula
+        </th>
+        <td mat-cell *matCellDef="let r" data-label="Estudiante">
+          <div class="student-cell">
+            <span class="avatar" aria-hidden="true">{{ r.registration.slice(-2) }}</span>
+            <div>
+              <strong>{{ r.studentName }}</strong
+              ><small>{{ r.registration }}</small>
+            </div>
+          </div>
+        </td></ng-container
+      >
+      <ng-container matColumnDef="delivery"
+        ><th scope="col" mat-header-cell *matHeaderCellDef>Entrega recibida</th>
+        <td mat-cell *matCellDef="let r" data-label="Entrega">
+          {{ r.submittedAt ? (r.submittedAt | date: 'dd MMM yyyy, HH:mm' : '-0500') : 'Sin entrega'
+          }}<small>Datos precargados</small>
+        </td></ng-container
+      >
+      <ng-container matColumnDef="state"
+        ><th scope="col" mat-header-cell *matHeaderCellDef>Estado de evaluación</th>
+        <td mat-cell *matCellDef="let r" data-label="Estado">
+          <span
+            class="pill"
+            [class.red]="r.deadlineState === 'vencido'"
+            [class.green]="r.state === 'calificada'"
+            [class.amber]="r.deadlineState === 'en-plazo'"
+            >{{
+              r.state === 'pendiente'
+                ? r.deadlineState === 'vencido'
+                  ? 'Vencido'
+                  : 'En plazo'
+                : r.state === 'calificada'
+                  ? 'Calificada'
+                  : 'Sin entrega'
+            }}</span
+          >
+          @if (r.state === 'pendiente') {
+            <small>Pendiente de calificar</small>
+          }
+        </td></ng-container
+      >
+      <ng-container matColumnDef="grade"
+        ><th scope="col" mat-header-cell *matHeaderCellDef>Calificación</th>
+        <td mat-cell *matCellDef="let r" data-label="Calificación">
+          {{ r.grade === null ? 'Sin calificación' : r.grade + ' / 100' }}
+        </td></ng-container
+      >
+      <ng-container matColumnDef="action"
+        ><th scope="col" mat-header-cell *matHeaderCellDef>Consulta</th>
+        <td mat-cell *matCellDef="let r" data-label="Consulta">
+          <a
+            mat-button
+            [routerLink]="['/seguimiento', r.id]"
+            [queryParams]="nav.recordQuery({ pagina: pageIndex(), tamano: pageSize() })"
+            >Ver ficha<span class="sr-only"> de {{ r.studentName }}</span>
+            <app-ui-icon name="arrowRight"
+          /></a></td
+      ></ng-container>
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns"></tr>
+    </table>
+  </div>
+  @if (filtered().length === 0) {
+    <div class="empty" role="status">
+      <h3>No hay registros para esta selección</h3>
+      <p>El corte y los filtros se conservan. Prueba otro estado o limpia la búsqueda.</p>
+      <button type="button" mat-button (click)="setSearch('')">Limpiar búsqueda</button>
+    </div>
+  }
+  <mat-paginator
+    [length]="filtered().length"
+    [pageSize]="pageSize()"
+    [pageIndex]="pageIndex()"
+    [pageSizeOptions]="[5, 10, 30]"
+    (page)="paginate($event)"
+    showFirstLastButtons
+    aria-label="Paginación de estudiantes"
+  ></mat-paginator>
+</section>

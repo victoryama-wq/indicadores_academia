@@ -1,0 +1,152 @@
+<a class="skip-link" href="#main">Saltar al contenido</a>
+@if (menuOpen()) {
+  <button
+    type="button"
+    class="nav-overlay"
+    aria-label="Cerrar menú desde el fondo"
+    tabindex="-1"
+    (click)="closeMenu()"
+  ></button>
+}
+<aside
+  class="sidebar"
+  id="primary-sidebar"
+  [class.is-open]="menuOpen()"
+  [cdkTrapFocus]="menuOpen()"
+  [cdkTrapFocusAutoCapture]="menuOpen()"
+>
+  <button type="button" mat-button class="mobile-menu menu-close" (click)="closeMenu()">
+    <app-ui-icon name="close" /> Cerrar menú
+  </button>
+  <a routerLink="/inicio" [queryParams]="nav.query()" class="brand" (click)="closeMenu()"
+    ><span class="brand-symbol" aria-hidden="true">T<app-ui-icon name="arrowUpRight" /></span
+    ><span>TEC PLAYA<small>INDICADORES DE ACADEMIA</small></span></a
+  >
+  <div class="campus">
+    <span class="eyebrow">SEDE INSTITUCIONAL</span><strong>Playa del Carmen</strong
+    ><span>Quintana Roo</span>
+  </div>
+  <nav aria-label="Navegación principal" (click)="closeMenu()">
+    <p class="nav-label">SEGUIMIENTO</p>
+    <a
+      routerLink="/inicio"
+      [queryParams]="nav.query()"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      ><app-ui-icon name="home" /> Inicio</a
+    >
+    <a
+      routerLink="/grupos"
+      [queryParams]="nav.query()"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      ><app-ui-icon name="book" /> Seguimiento académico</a
+    >
+    @for (item of upcoming; track item.path) {
+      <a
+        [routerLink]="item.path"
+        [queryParams]="nav.query()"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        ><app-ui-icon [name]="item.icon" />
+        <span>{{ item.label }}<small>Próximamente</small></span></a
+      >
+    }
+    @if (nav.profile() === 'sistemas') {
+      <p class="nav-label">ADMINISTRACIÓN · SISTEMAS</p>
+      <a
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        routerLink="/admin/catalogos"
+        [queryParams]="nav.query()"
+        ><app-ui-icon name="people" />
+        <span>Usuarios y catálogos<small>Próximamente</small></span></a
+      >
+      <a
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        routerLink="/admin/integracion"
+        [queryParams]="nav.query()"
+        ><app-ui-icon name="settings" />
+        <span>Integración y operación<small>Próximamente</small></span></a
+      >
+    }
+  </nav>
+  <div class="sidebar-footer">
+    <span class="status-dot"></span> Entorno local de demostración<small
+      >Versión 0.1 · Sin conexión a Moodle</small
+    >
+  </div>
+</aside>
+<div class="workspace" [inert]="menuOpen()">
+  <header class="topbar">
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        mat-icon-button
+        #menuToggle
+        class="mobile-menu"
+        aria-label="Abrir menú"
+        [attr.aria-expanded]="menuOpen()"
+        aria-controls="primary-sidebar"
+        (click)="menuOpen.set(!menuOpen())"
+      >
+        <app-ui-icon name="menu" />
+      </button>
+      <div>
+        <strong>Consola de Academia</strong
+        ><small class="desktop-caption">Seguimiento de entregas y calificaciones</small>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="demo-badge">Datos simulados</span>
+      @defer (on idle) {
+        <app-profile-selector />
+      } @placeholder {
+        <button type="button" mat-button class="profile-placeholder" disabled aria-busy="true">
+          {{ nav.profileLabel() }}
+        </button>
+      }
+      <span class="avatar desktop-caption" aria-hidden="true">{{
+        nav.profileLabel().slice(0, 2).toUpperCase()
+      }}</span>
+    </div>
+  </header>
+  <div class="context-bar" role="region" aria-label="Contexto del periodo, corte y grupo">
+    <span><b>Periodo</b> {{ nav.periodLabel() }}</span
+    ><span><b>Corte</b> {{ nav.cutLabel() }} · Cancún</span
+    ><span
+      ><b>Grupo</b> {{ nav.context().grupo === 'todos' ? 'Todos en el ámbito' : 'ENF-301' }} ·
+      {{
+        nav.context().modalidad === 'todas' ? 'Todas las modalidades' : nav.context().modalidad
+      }}</span
+    >
+  </div>
+  <main #mainContent id="main" tabindex="-1">
+    @if (nav.profile() === 'direccion') {
+      <div class="notice info compact">
+        Dirección · Modo consulta. Exportación pendiente de definición de Academia (D08).
+      </div>
+    }
+    @if (store.result().status === 'loading') {
+      <section class="panel loading" aria-live="polite">
+        <p>Cargando datos simulados del corte…</p>
+        <mat-progress-bar mode="indeterminate" aria-label="Cargando datos"></mat-progress-bar>
+      </section>
+    } @else if (store.result().status === 'error') {
+      <section class="panel empty" role="alert">
+        <h1>No pudimos consultar este corte</h1>
+        <p>Error simulado. No se muestran ceros ni se mezclan resultados de otros cortes.</p>
+        <button type="button" mat-flat-button (click)="store.reload()">Reintentar</button>
+        <button type="button" mat-button (click)="nav.reset()">
+          Volver al corte de demostración
+        </button>
+      </section>
+    } @else {
+      <router-outlet />
+    }
+    <footer class="page-footer">
+      <span>TEC PLAYA / Academia</span><span>Datos ficticios · Demo local · America/Cancun</span>
+    </footer>
+  </main>
+</div>

@@ -1,0 +1,123 @@
+<nav class="breadcrumbs" aria-label="Ruta de navegación">
+  Inicio <span aria-hidden="true">/</span> Tablero de Academia
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">UNA VISTA CLARA DEL SEGUIMIENTO</span>
+    <h1>Supervisión académica</h1>
+    <p>Consulta las entregas y calificaciones de tu ámbito.</p>
+  </div>
+  <span class="pill green">Demostración local</span>
+</div>
+<app-context-filters />
+@if (store.data()?.groups?.length) {
+  <section class="hero-banner">
+    <div>
+      <span class="eyebrow">CONTINÚA EL RECORRIDO</span>
+      <h2>ENF-301 · Licenciatura en Enfermería</h2>
+      <p>Escolarizada · 1 asignatura · 1 actividad incluida en esta demo</p>
+    </div>
+    <a class="hero-action" mat-flat-button routerLink="/grupos/g01" [queryParams]="nav.query()"
+      >Ver grupos y asignaturas <app-ui-icon name="arrowRight"
+    /></a>
+  </section>
+}
+<app-metrics />
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mt-5">
+  <section class="panel xl:col-span-2">
+    <div class="panel-heading">
+      <div>
+        <h2>Desglose por grupo</h2>
+        <p>Personas y registros dentro del mismo corte.</p>
+      </div>
+      <a mat-button routerLink="/grupos" [queryParams]="nav.query()"
+        >Consultar grupos <app-ui-icon name="arrowRight"
+      /></a>
+    </div>
+    @if (store.data()?.groups?.length && store.data()?.status === 'complete') {
+      <div class="group-summary">
+        <span class="group-monogram" aria-hidden="true">E3</span>
+        <div>
+          <h3>Licenciatura en Enfermería</h3>
+          <p>ENF-301 · Escolarizada · {{ store.counts().students }} estudiantes</p>
+        </div>
+        <span class="pill">1 asignatura</span>
+      </div>
+      <div class="progress-grid">
+        <div>
+          <div class="flex justify-between gap-2">
+            <span
+              >Entrega
+              <small
+                >{{ store.counts().received }} / {{ store.counts().expected }} esperadas</small
+              ></span
+            ><strong>{{ deliveryPercent() }}%</strong>
+          </div>
+          <div class="bar"><span [style.width.%]="deliveryPercent()"></span></div>
+        </div>
+        <div>
+          <div class="flex justify-between gap-2">
+            <span
+              >Calificación
+              <small
+                >{{ store.counts().graded }} / {{ store.counts().received }} recibidas</small
+              ></span
+            ><strong>{{ gradingPercent() }}%</strong>
+          </div>
+          <div class="bar green-bar"><span [style.width.%]="gradingPercent()"></span></div>
+        </div>
+      </div>
+      <div class="panel-note">
+        <span class="pill red">{{ store.counts().overdue }} pendientes vencidos</span
+        ><span>{{ store.counts().within }} pendientes en plazo · Estados precargados</span>
+      </div>
+    } @else {
+      <div class="empty">
+        <h3>
+          {{
+            store.data()?.status === 'incomplete'
+              ? 'Corte sin información suficiente'
+              : 'No hay grupos para estos filtros'
+          }}
+        </h3>
+        <p>
+          {{
+            store.data()?.status === 'incomplete'
+              ? 'No se calculan porcentajes de este corte.'
+              : 'La demo contiene Enfermería, Escolarizada, Unidad 1 y una tarea en 27-1.'
+          }}
+        </p>
+      </div>
+    }
+  </section>
+  <section class="panel coverage">
+    <span class="eyebrow">ALCANCE DE LA INFORMACIÓN</span>
+    <h2>Cobertura de la demo</h2>
+    @if (store.data()?.status === 'complete' && store.counts().expected) {
+      <div class="coverage-ring">
+        <strong
+          >100%<small
+            >{{ store.counts().expected }} de {{ store.counts().expected }} registros</small
+          ></strong
+        >
+      </div>
+      <p>Estados conocidos en el conjunto ficticio seleccionado.</p>
+      <div class="notice info compact">
+        Actualización simulada<br /><strong>06 nov 2026 · 18:00 h</strong>
+      </div>
+    } @else {
+      <div class="empty">
+        <strong>No calculable</strong>
+        <p>Sin evidencia suficiente o sin registros esperados.</p>
+      </div>
+    }
+    <p class="fine-print">No representa cobertura institucional ni una consulta a Moodle.</p>
+  </section>
+</div>
+<div class="notice neutral mt-5">
+  <strong>Lectura de los indicadores</strong>
+  <p>
+    Una persona puede generar varios registros en otras actividades. Esta demo incluye una actividad
+    por estudiante. Plazos y reglas oficiales pendientes de definición de Academia.
+  </p>
+</div>

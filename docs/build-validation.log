@@ -1,0 +1,36 @@
+
+> indicadores-academia-demo@0.0.0 build
+> ng build --stats-json
+
+> Building...
+√ Building...
+Initial chunk files | Names            |  Raw size | Estimated transfer size
+chunk-KONOW2ZR.js   | -                | 358.35 kB |                96.23 kB
+chunk-JSHYZH4D.js   | -                |  51.91 kB |                 8.90 kB
+styles-UPBK7D43.css | styles           |  32.63 kB |                 6.91 kB
+main-IM2MS6UE.js    | main             |  24.79 kB |                 6.91 kB
+chunk-UM3EWIUP.js   | -                | 781 bytes |               781 bytes
+chunk-2NFLSA4Y.js   | -                | 449 bytes |               449 bytes
+
+                    | Initial total    | 468.91 kB |               120.18 kB
+
+Lazy chunk files    | Names            |  Raw size | Estimated transfer size
+chunk-VOAKVS6F.js   | -                | 176.81 kB |                33.33 kB
+chunk-WYA5NL6G.js   | activity-detail  |  93.11 kB |                21.35 kB
+chunk-ATCUFEGO.js   | -                |  40.08 kB |                 8.53 kB
+chunk-3UOSJCEV.js   | -                |  22.58 kB |                 5.60 kB
+chunk-XFJLVQSY.js   | -                |   9.84 kB |                 2.81 kB
+chunk-VQIFILV7.js   | subject-detail   |   6.62 kB |                 2.26 kB
+chunk-4HMWLSVM.js   | group-detail     |   6.27 kB |                 2.18 kB
+chunk-P7YQ73EP.js   | home             |   5.69 kB |                 2.13 kB
+chunk-KHSBPVML.js   | followup         |   4.44 kB |                 1.80 kB
+chunk-DRONQBHF.js   | -                |   2.52 kB |                 1.13 kB
+chunk-4RY6E44E.js   | groups           |   2.18 kB |                 1.06 kB
+chunk-LQILROS3.js   | status-page      |   1.48 kB |               783 bytes
+chunk-IRAHAXOW.js   | profile-selector | 993 bytes |               993 bytes
+chunk-JPSMOV26.js   | groups-routes    | 285 bytes |               285 bytes
+
+Application bundle generation complete. [7.672 seconds] - 2026-11-10T18:02:34.166Z
+
+Output location: C:\Users\Admin\Documents\Indicadores_Academia\indicadores-academia-demo\dist\indicadores-academia-demo
+
