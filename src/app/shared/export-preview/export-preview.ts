@@ -3,6 +3,8 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButton } from '@angular/material/button';
 import { TrackingRecord } from '../../core/models';
 export interface PreviewData {
+  scope: string;
+  total: number;
   period: string;
   cut: string;
   state: string;
@@ -32,7 +34,7 @@ export interface PreviewData {
         </div>
         <div>
           <dt>Ámbito</dt>
-          <dd>ENF-301 · Enfermería Clínica · Plan de cuidados</dd>
+          <dd>{{ data.scope }}</dd>
         </div>
         <div>
           <dt>Selección</dt>
@@ -44,7 +46,10 @@ export interface PreviewData {
         </div>
         <div>
           <dt>Cobertura del conjunto simulado</dt>
-          <dd>30 de 30 registros con estado conocido · Actualización: 06 nov 2026, 18:00 h</dd>
+          <dd>
+            {{ data.total }} de {{ data.total }} registros con estado conocido · Actualización: 06
+            nov 2026, 18:00 h
+          </dd>
         </div>
       </dl>
       <h3>Registros de la selección</h3>

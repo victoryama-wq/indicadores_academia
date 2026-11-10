@@ -33,13 +33,15 @@ import { spanishPaginator } from './paginator-intl';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RecordList {
+  readonly activityId = input.required<string>();
+  readonly scope = input.required<string>();
   readonly records = input.required<readonly TrackingRecord[]>();
   readonly nav = inject(NavigationContext);
   private readonly dialog = inject(MatDialog);
   readonly labels = STATE_LABELS;
   readonly states = Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }));
   readonly columns = ['student', 'delivery', 'state', 'grade', 'action'];
-  readonly search = this.nav.studentSearch;
+  readonly search = computed(() => this.nav.studentSearch(this.activityId()));
   readonly filtered = computed(() =>
     selectRecords(this.records(), this.nav.state())
       .filter((r) =>
@@ -80,7 +82,7 @@ export class RecordList {
     () => this.filtered().filter((r) => r.deadlineState === 'en-plazo').length,
   );
   setSearch(value: string) {
-    this.nav.setStudentSearch(value);
+    this.nav.setStudentSearch(value, this.activityId());
     void this.nav.update({ pagina: 0 });
   }
   stateChange(value: string) {
@@ -102,7 +104,8 @@ export class RecordList {
         cut: this.nav.cutLabel(),
         state: STATE_LABELS[this.nav.state()],
         filters:
-          'Enfermería · ' +
+          this.nav.context().carrera +
+          ' · ' +
           this.nav.context().modalidad +
           ' · ' +
           this.nav.context().tipo +
@@ -112,6 +115,8 @@ export class RecordList {
           this.nav.context().docente +
           (this.search() ? ' · Búsqueda: ' + this.search() : ''),
         records: this.filtered(),
+        scope: this.scope(),
+        total: this.records().length,
       },
     });
   }

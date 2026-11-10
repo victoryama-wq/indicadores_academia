@@ -15,6 +15,9 @@ import { NavigationContext } from '../../../core/navigation-context';
 export class Home {
   readonly store = inject(QueryStore);
   readonly nav = inject(NavigationContext);
+  readonly singleActivity = computed(() =>
+    this.store.data()?.activities.length === 1 ? this.store.data()?.activities[0].id : undefined,
+  );
   readonly deliveryPercent = computed(() =>
     this.store.counts().expected
       ? Math.round((100 * this.store.counts().received) / this.store.counts().expected)

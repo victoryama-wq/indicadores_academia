@@ -2,6 +2,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   inject,
   Injector,
@@ -40,6 +41,11 @@ import { UiIcon, UiIconName } from './shared/ui-icon/ui-icon';
 export class App {
   readonly nav = inject(NavigationContext);
   readonly store = inject(QueryStore);
+  readonly groupLabel = computed(
+    () =>
+      this.store.data()?.catalog.groups.find((g) => g.id === this.nav.context().grupo)?.name ??
+      this.nav.context().grupo,
+  );
   readonly menuOpen = signal(false);
   private readonly injector = inject(Injector);
   private readonly menuToggle = viewChild('menuToggle', {

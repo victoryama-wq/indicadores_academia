@@ -6,6 +6,7 @@ import { DatePipe } from '@angular/common';
 import { MatButton } from '@angular/material/button';
 import { Metrics } from '../../../shared/metrics/metrics';
 import { RecordList } from '../../../shared/record-list/record-list';
+import { countRecords } from '../../../core/models';
 import { QueryStore } from '../../../core/query-store';
 import { NavigationContext } from '../../../core/navigation-context';
 @Component({
@@ -15,21 +16,37 @@ import { NavigationContext } from '../../../core/navigation-context';
   template: `
     <nav class="breadcrumbs" aria-label="Ruta de navegación">
       <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span>/</span
-      ><a routerLink="/grupos/g01" [queryParams]="nav.query()">ENF-301</a><span>/</span
-      ><a routerLink="/asignaturas/i01" [queryParams]="nav.query()">Enfermería Clínica</a
+      ><a
+        [routerLink]="group() ? ['/grupos', group()?.id] : ['/grupos']"
+        [queryParams]="nav.query()"
+        >{{ group()?.name ?? 'Grupos' }}</a
+      ><span>/</span
+      ><a
+        [routerLink]="subject() ? ['/asignaturas', subject()?.id] : ['/grupos']"
+        [queryParams]="nav.query()"
+        >{{ subject()?.name ?? 'Asignaturas' }}</a
       ><span aria-hidden="true">/</span>Actividad
     </nav>
-    <a mat-button routerLink="/asignaturas/i01" [queryParams]="nav.query()"
-      ><app-ui-icon name="arrowLeft" /> Volver a Enfermería Clínica</a
+    <a
+      mat-button
+      [routerLink]="subject() ? ['/asignaturas', subject()?.id] : ['/grupos']"
+      [queryParams]="nav.query()"
+      ><app-ui-icon name="arrowLeft" /> Volver a {{ subject()?.name ?? 'grupos' }}</a
     >
+    @if (nav.originTeacher()) {
+      <a mat-button [routerLink]="['/docentes', nav.originTeacher()]" [queryParams]="nav.query()"
+        >Volver al detalle docente</a
+      >
+    }
     @if (activity(); as a) {
       <section class="panel detail-hero">
         <div>
           <span class="eyebrow">ACTIVIDAD · {{ a.type }} · {{ a.unit }}</span>
           <h1>{{ a.name }}</h1>
-          <p>Caso clínico de demostración · ENF-301 · Escolarizada</p>
+          <p>{{ group()?.name }} · {{ group()?.modality }} · Datos ficticios</p>
           <div class="detail-meta">
-            <span><small>Docente responsable</small><strong>Docente Demo A</strong></span
+            <span
+              ><small>Docente responsable</small><strong>{{ subject()?.teacher }}</strong></span
             ><span
               ><small>Fecha de entrega simulada</small
               ><strong>{{ a.dueAt | date: 'dd MMM yyyy, HH:mm' : '-0500' }}</strong></span
@@ -41,12 +58,11 @@ import { NavigationContext } from '../../../core/navigation-context';
           ><span>Estados precargados</span>
         </div>
       </section>
-      <app-metrics />
+      <app-metrics [records]="records()" [activityId]="a.id" />
       @if (store.data()?.status === 'complete') {
         <div class="notice warning mt-5">
           <strong
-            >{{ store.counts().overdue }} pendientes vencidos · {{ store.counts().within }} en
-            plazo</strong
+            >{{ counts().overdue }} pendientes vencidos · {{ counts().within }} en plazo</strong
           >
           <p>
             Clasificación simulada. No implica un plazo institucional aprobado ni envía
@@ -59,28 +75,28 @@ import { NavigationContext } from '../../../core/navigation-context';
             routerLink="."
             [queryParams]="nav.query({ estado: 'todos', pagina: 0 })"
             [attr.aria-current]="nav.state() === 'todos' ? 'true' : null"
-            >Todos ({{ store.counts().expected }})</a
+            >Todos ({{ counts().expected }})</a
           ><a
             mat-button
             routerLink="."
             [queryParams]="nav.query({ estado: 'pendiente', pagina: 0 })"
             [attr.aria-current]="nav.state() === 'pendiente' ? 'true' : null"
-            >Pendientes ({{ store.counts().pending }})</a
+            >Pendientes ({{ counts().pending }})</a
           ><a
             mat-button
             routerLink="."
             [queryParams]="nav.query({ estado: 'vencido', pagina: 0 })"
             [attr.aria-current]="nav.state() === 'vencido' ? 'true' : null"
-            >Vencidos ({{ store.counts().overdue }})</a
+            >Vencidos ({{ counts().overdue }})</a
           ><a
             mat-button
             routerLink="."
             [queryParams]="nav.query({ estado: 'en-plazo', pagina: 0 })"
             [attr.aria-current]="nav.state() === 'en-plazo' ? 'true' : null"
-            >En plazo ({{ store.counts().within }})</a
+            >En plazo ({{ counts().within }})</a
           >
         </nav>
-        <app-record-list [records]="records()" />
+        <app-record-list [records]="records()" [scope]="scope()" [activityId]="a.id" />
       }
     } @else {
       <section class="panel empty">
@@ -98,6 +114,16 @@ export class ActivityDetail {
   readonly activity = computed(() =>
     this.store.data()?.activities.find((a) => a.id === this.params()?.get('actividadId')),
   );
+  readonly subject = computed(() =>
+    this.store.data()?.subjects.find((s) => s.id === this.activity()?.subjectId),
+  );
+  readonly group = computed(() =>
+    this.store.data()?.groups.find((g) => g.id === this.subject()?.groupId),
+  );
+  readonly scope = computed(() =>
+    [this.group()?.name, this.subject()?.name, this.activity()?.name].join(' · '),
+  );
+  readonly counts = computed(() => countRecords(this.records()));
   readonly records = computed(
     () => this.store.data()?.records.filter((r) => r.activityId === this.activity()?.id) ?? [],
   );

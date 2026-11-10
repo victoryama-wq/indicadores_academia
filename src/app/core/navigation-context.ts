@@ -2,7 +2,14 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { NavigationEnd, Params, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
-import { DEFAULT_CONTEXT, Profile, QueryContext, STATE_LABELS, StateFilter } from './models';
+import {
+  DEFAULT_CONTEXT,
+  TEACHER_CONTEXT,
+  Profile,
+  QueryContext,
+  STATE_LABELS,
+  StateFilter,
+} from './models';
 
 @Injectable({ providedIn: 'root' })
 export class NavigationContext {
@@ -18,7 +25,9 @@ export class NavigationContext {
   readonly context = computed<QueryContext>(() => {
     const p = this.params();
     return Object.fromEntries(
-      Object.entries(DEFAULT_CONTEXT).map(([key, value]) => [key, String(p[key] ?? value)]),
+      Object.entries(
+        this.router.url.startsWith('/docentes') ? TEACHER_CONTEXT : DEFAULT_CONTEXT,
+      ).map(([key, value]) => [key, String(p[key] ?? value)]),
     ) as unknown as QueryContext;
   });
   readonly profile = signal<Profile>(this.readProfile());
@@ -47,17 +56,37 @@ export class NavigationContext {
       : 'todos',
   );
   readonly canPreview = computed(() => this.profile() !== 'direccion');
-  readonly studentSearch = signal(this.readSearch());
-  setStudentSearch(value: string) {
-    this.studentSearch.set(value);
+  private readonly studentSearches = signal<ReadonlyMap<string, string>>(new Map());
+  studentSearch(activityId: string): string {
+    return (
+      this.studentSearches().get(activityId) ??
+      this.readStoredSearch('academia-student-search:' + activityId)
+    );
+  }
+  readonly teacherSearch = signal(this.readStoredSearch('academia-teacher-search'));
+  readonly originTeacher = computed(() => String(this.params()['origenDocente'] ?? ''));
+  setTeacherSearch(value: string) {
+    this.teacherSearch.set(value);
     try {
-      sessionStorage.setItem('academia-search-a01', value);
+      sessionStorage.setItem('academia-teacher-search', value);
+    } catch {
+      /* Optional storage. */
+    }
+  }
+  setStudentSearch(value: string, activityId: string) {
+    this.studentSearches.update((searches) => new Map(searches).set(activityId, value));
+    try {
+      sessionStorage.setItem('academia-student-search:' + activityId, value);
     } catch {
       /* Optional storage. */
     }
   }
   query(extra: Params = {}): Params {
-    return { ...this.context(), ...extra };
+    return {
+      ...this.context(),
+      ...(this.originTeacher() ? { origenDocente: this.originTeacher() } : {}),
+      ...extra,
+    };
   }
   recordQuery(extra: Params = {}): Params {
     return this.query({
@@ -86,6 +115,16 @@ export class NavigationContext {
   reset() {
     return this.router.navigate(['/inicio'], { queryParams: DEFAULT_CONTEXT });
   }
+  resetFilters() {
+    return this.router.url.startsWith('/docentes') ? this.resetTeachers() : this.reset();
+  }
+  restoreDemoCut() {
+    return this.router.url.startsWith('/docentes') ? this.update({ corte: 'c01' }) : this.reset();
+  }
+  resetTeachers() {
+    this.setTeacherSearch('');
+    return this.router.navigate(['/docentes'], { queryParams: TEACHER_CONTEXT });
+  }
   private readProfile(): Profile {
     try {
       const v = sessionStorage.getItem('academia-profile');
@@ -94,9 +133,9 @@ export class NavigationContext {
       return 'coordinacion';
     }
   }
-  private readSearch() {
+  private readStoredSearch(key: string) {
     try {
-      return sessionStorage.getItem('academia-search-a01') ?? '';
+      return sessionStorage.getItem(key) ?? '';
     } catch {
       return '';
     }

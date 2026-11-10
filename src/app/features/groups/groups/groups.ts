@@ -1,5 +1,5 @@
 import { UiIcon } from '../../../shared/ui-icon/ui-icon';
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButton } from '@angular/material/button';
 import { ContextFilters } from '../../../shared/context-filters/context-filters';
@@ -22,13 +22,13 @@ import { NavigationContext } from '../../../core/navigation-context';
       </div>
     </div>
     <app-context-filters />
-    @for (g of store.data()?.groups; track g.id) {
+    @for (g of groups(); track g.id) {
       <section class="panel group-card">
-        <span class="group-monogram" aria-hidden="true">E3</span>
+        <span class="group-monogram" aria-hidden="true">{{ g.name.slice(0, 2) }}</span>
         <div>
           <span class="eyebrow">{{ g.modality }}</span>
           <h2>{{ g.name }}</h2>
-          <p>{{ g.program }} · 1 asignatura incluida</p>
+          <p>{{ g.program }} · {{ g.subjectCount }} imparticiones incluidas</p>
         </div>
         <a mat-flat-button [routerLink]="['/grupos', g.id]" [queryParams]="nav.query()"
           >Ver grupo <app-ui-icon name="arrowRight"
@@ -45,5 +45,11 @@ import { NavigationContext } from '../../../core/navigation-context';
 })
 export class Groups {
   readonly store = inject(QueryStore);
+  readonly groups = computed(() =>
+    (this.store.data()?.groups ?? []).map((g) => ({
+      ...g,
+      subjectCount: this.store.data()?.subjects.filter((s) => s.groupId === g.id).length ?? 0,
+    })),
+  );
   readonly nav = inject(NavigationContext);
 }

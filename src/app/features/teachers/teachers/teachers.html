@@ -1,0 +1,137 @@
+<nav class="breadcrumbs" aria-label="Ruta de navegación">
+  <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a
+  ><span aria-hidden="true">/</span>Seguimiento docente
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">CONSULTA POR RESPONSABLE SIMULADO</span>
+    <h1>Seguimiento docente</h1>
+    <p>Entregas y calificaciones de las imparticiones dentro de tu selección.</p>
+  </div>
+  <span class="pill green">Demostración local</span>
+</div>
+<app-context-filters />
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <h2>Docentes en la selección</h2>
+      <p>Una entrega es un par estudiante–actividad. No equivale a una persona única.</p>
+    </div>
+    <button mat-button type="button" (click)="nav.resetTeachers()">Ver todo el ámbito demo</button>
+  </div>
+  <div class="list-filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic"
+      ><mat-label>Buscar docente</mat-label
+      ><input
+        #searchInput
+        matInput
+        type="search"
+        autocomplete="off"
+        [value]="nav.teacherSearch()"
+        (input)="nav.setTeacherSearch(searchInput.value)" /></mat-form-field
+    ><span role="status">{{ rows().length }} docentes encontrados</span>
+  </div>
+  @if (store.data()?.status === 'incomplete') {
+    <div class="notice warning m-5" role="status">
+      <strong>Información incompleta</strong>
+      <p>Las asignaciones son ficticias; los totales no son calculables en este corte.</p>
+    </div>
+  }
+  @if (rows().length) {
+    <div
+      class="table-scroll overflow-x-auto"
+      tabindex="0"
+      role="region"
+      aria-label="Tabla: Seguimiento docente"
+    >
+      <table
+        mat-table
+        [dataSource]="rows()"
+        class="responsive-table"
+        aria-label="Seguimiento docente"
+      >
+        <ng-container matColumnDef="teacher"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Docente</th>
+          <td mat-cell *matCellDef="let t" data-label="Docente">
+            <strong>{{ t.name }}</strong
+            ><small>Identidad ficticia</small>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="assignments"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Grupos y asignaturas</th>
+          <td mat-cell *matCellDef="let t" data-label="A cargo">
+            <div>
+              @for (s of t.subjects; track s.id) {
+                <span class="assignment">{{ s.group?.name }} · {{ s.name }}</span>
+              }
+            </div>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="graded"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Entregas calificadas</th>
+          <td mat-cell *matCellDef="let t" data-label="Calificadas" data-testid="graded">
+            {{ store.data()?.status === 'complete' ? t.counts.graded : 'No calculable' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="pending"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Entregas pendientes</th>
+          <td mat-cell *matCellDef="let t" data-label="Pendientes" data-testid="pending">
+            <span
+              class="pill"
+              [class.green]="t.counts.pending === 0 && store.data()?.status === 'complete'"
+              >{{ store.data()?.status === 'complete' ? t.counts.pending : 'No calculable' }}</span
+            >
+          </td></ng-container
+        >
+        <ng-container matColumnDef="overdue"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Pendientes vencidos</th>
+          <td mat-cell *matCellDef="let t" data-label="Vencidos" data-testid="overdue">
+            {{ store.data()?.status === 'complete' ? t.counts.overdue : 'No calculable' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="within"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Pendientes en plazo</th>
+          <td mat-cell *matCellDef="let t" data-label="En plazo" data-testid="within">
+            {{ store.data()?.status === 'complete' ? t.counts.within : 'No calculable' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="action"
+          ><th mat-header-cell *matHeaderCellDef scope="col">Consulta</th>
+          <td mat-cell *matCellDef="let t" data-label="Consulta">
+            <a
+              mat-button
+              [routerLink]="['/docentes', t.id]"
+              [queryParams]="nav.query({ origenDocente: null })"
+              [attr.aria-label]="'Ver detalle de ' + t.name"
+              >Ver detalle <app-ui-icon name="arrowRight"
+            /></a></td
+        ></ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: columns"
+          [attr.data-testid]="'teacher-' + row.id"
+        ></tr>
+      </table>
+    </div>
+  } @else {
+    <div class="empty" role="status">
+      <h3>No hay docentes para esta selección</h3>
+      <p>
+        Prueba otra búsqueda o modifica los filtros. La ausencia de resultados no indica
+        incumplimiento.
+      </p>
+      <button mat-button type="button" (click)="nav.resetTeachers()">
+        Restablecer consulta docente
+      </button>
+    </div>
+  }
+</section>
+<div class="notice neutral mt-5">
+  <strong>Lectura de demostración</strong>
+  <p>
+    Se muestran responsabilidades precargadas, sin ranking. Los perfiles simulados comparten estos
+    datos ficticios; no representan permisos institucionales. Plazos, responsables y ámbitos
+    pendientes de validación de Academia.
+  </p>
+</div>
