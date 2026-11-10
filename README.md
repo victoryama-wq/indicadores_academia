@@ -23,6 +23,12 @@ npm run test:e2e
 
 Las pruebas E2E utilizan Microsoft Edge instalado (`channel: msedge`) y arrancan el servidor cuando es necesario. `npx playwright show-report` abre el reporte local. La compilación se genera en `dist/indicadores-academia-demo/browser`. Una futura configuración de alojamiento deberá resolver las rutas Angular hacia `index.html`; no se ha configurado ni publicado alojamiento.
 
+## Integración continua
+
+El workflow [CI](.github/workflows/ci.yml) ejecuta el trabajo **Validación Angular** en pull requests dirigidos a `main`, pushes a `main` y ejecución manual desde Actions (cuando el workflow esté en la rama predeterminada). Usa Ubuntu 24.04, Node 24.14.1, caché de npm basada en `package-lock.json` y permisos `contents: read`. Ejecuta, en pasos separados y en este orden: `npm ci`, `npm run build`, `npm test` y `npm run test:dependencies`. Valida instalación, compilación, datos ficticios y compatibilidad de dependencias, sin credenciales de Firebase ni Moodle.
+
+Playwright (`npm run test:e2e`, canal `msedge`) queda para un trabajo posterior. La primera ejecución en GitHub confirmará Ubuntu antes de configurar **Validación Angular** como comprobación requerida. Este cambio no modifica las reglas de protección ni publica la demo.
+
 ## Recorrido
 
 | Ruta | Resultado |
@@ -85,4 +91,4 @@ Los ajustes de dependencias transitivas, sus pruebas de compatibilidad y la redu
 
 El refactor visual, las skills locales aplicadas y la instalación de `angular/skills` se documentan en [docs/REFACTOR-UI-SKILLS.md](docs/REFACTOR-UI-SKILLS.md). Incluye mejoras de accesibilidad, tablas móviles, iconografía local y evidencia de que los contratos y dependencias de la demo permanecen intactos.
 
-Próximamente: seguimiento docente, reportes completos y descarga, históricos, calidad de información y formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, conexión Moodle de solo lectura y publicación pertenecen a otras etapas. No se hicieron commit, push, CI ni despliegue.
+Próximamente: seguimiento docente, reportes completos y descarga, históricos, calidad de información y formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, conexión Moodle de solo lectura y publicación pertenecen a otras etapas. La demo no se ha desplegado.
