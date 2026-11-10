@@ -27,7 +27,10 @@ for (const width of [1440, 1280, 1024, 768, 640, 375, 320]) {
     await ready(page, 'Supervisión académica');
     await expect(page.locator('app-profile-selector mat-label')).toBeVisible();
     await audit(page);
-    await page.screenshot({ path: `docs/evidencia/inicio-${width}.png`, fullPage: true });
+    await test.info().attach('inicio', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
     await page.getByRole('link', { name: 'Ver grupos y asignaturas' }).click();
     await ready(page, 'Grupo ENF-301');
     await audit(page);
@@ -58,7 +61,10 @@ for (const width of [1440, 1280, 1024, 768, 640, 375, 320]) {
     await page.reload();
     await expect(page.locator('app-record-list tbody tr')).toHaveCount(6);
     await audit(page);
-    await page.screenshot({ path: `docs/evidencia/pendientes-${width}.png`, fullPage: true });
+    await test.info().attach('pendientes', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
     await page.getByRole('link', { name: 'Ver ficha de Estudiante Demo 019' }).click();
     await ready(page, 'Estudiante Demo 019');
     await audit(page);
@@ -75,6 +81,11 @@ for (const width of [1440, 1280, 1024, 768, 640, 375, 320]) {
     await preview.click();
     await expect(page.getByRole('dialog')).toContainText('6 registros');
     await expect(page.getByRole('dialog').locator('li')).toHaveCount(6);
+    // Axe debe medir el contraste final, no la opacidad durante la apertura de Material.
+    await expect(page.getByRole('dialog').locator('.mat-mdc-dialog-inner-container')).toHaveCSS(
+      'opacity',
+      '1',
+    );
     await audit(page);
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);

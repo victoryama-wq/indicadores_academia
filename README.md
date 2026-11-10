@@ -27,7 +27,11 @@ Las pruebas E2E utilizan Microsoft Edge instalado (`channel: msedge`) y arrancan
 
 El workflow [CI](.github/workflows/ci.yml) ejecuta el trabajo **Validación Angular** en pull requests dirigidos a `main`, pushes a `main` y ejecución manual desde Actions (cuando el workflow esté en la rama predeterminada). Usa Ubuntu 24.04, Node 24.14.1, caché de npm basada en `package-lock.json` y permisos `contents: read`. Ejecuta, en pasos separados y en este orden: `npm ci`, `npm run build`, `npm test` y `npm run test:dependencies`. Valida instalación, compilación, datos ficticios y compatibilidad de dependencias, sin credenciales de Firebase ni Moodle.
 
-Playwright (`npm run test:e2e`, canal `msedge`) queda para un trabajo posterior. La primera ejecución en GitHub confirmará Ubuntu antes de configurar **Validación Angular** como comprobación requerida. Este cambio no modifica las reglas de protección ni publica la demo.
+El job independiente **E2E Edge** usa Ubuntu 24.04, Node 24.14.1 y caché por el mismo lockfile. Ejecuta `npm ci`, `npx playwright install --with-deps msedge` y `npm run test:e2e` en modo headless. Playwright inicia y espera su propio servidor local en CI; fuera de CI puede reutilizar uno existente. El recorrido comprueba seis pendientes (cuatro vencidos y dos en plazo) en siete anchos de pantalla. Los estados están precargados al corte ficticio y no dependen del día de ejecución.
+
+El artefacto `playwright-edge` conserva `playwright-report/` y `test-results/` durante 7 días, también si fallan las pruebas (salvo cancelación de la ejecución). Incluye capturas del recorrido en el reporte HTML y trazas/capturas ante fallos; las capturas históricas de `docs/evidencia/` no se sobrescriben. Los fallos de pruebas hacen fallar el job. Ambos trabajos validan únicamente datos ficticios y servicios locales, sin acceso a Moodle ni Firebase de producción.
+
+**Validación Angular** conserva su nombre y sigue siendo obligatoria para `main`. **E2E Edge** se evaluará como comprobación obligatoria después de demostrar su funcionamiento en GitHub. Este cambio no modifica el ruleset ni publica la demo.
 
 ## Recorrido
 
