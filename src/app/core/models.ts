@@ -13,6 +13,7 @@ export interface QueryContext {
   tipo: string;
   unidad: string;
   docente: string;
+  asignatura: string;
 }
 export interface Group {
   id: string;
@@ -20,6 +21,17 @@ export interface Group {
   program: string;
   modality: string;
   periodId: string;
+  programId: string;
+  modalityId: string;
+}
+export interface Teacher {
+  id: string;
+  name: string;
+}
+export interface AcademicCatalog {
+  groups: readonly Group[];
+  subjects: readonly Subject[];
+  teachers: readonly Teacher[];
 }
 export interface Subject {
   id: string;
@@ -50,6 +62,7 @@ export interface TrackingRecord {
   gradingDueAt: string | null;
 }
 export interface Snapshot {
+  catalog: AcademicCatalog;
   status: 'complete' | 'incomplete';
   groups: readonly Group[];
   subjects: readonly Subject[];
@@ -80,6 +93,13 @@ export const DEFAULT_CONTEXT: QueryContext = {
   tipo: 'todos',
   unidad: 'todas',
   docente: 'todos',
+  asignatura: 'todas',
+};
+export const TEACHER_CONTEXT: QueryContext = {
+  ...DEFAULT_CONTEXT,
+  carrera: 'todas',
+  modalidad: 'todas',
+  grupo: 'todos',
 };
 export const STATE_LABELS: Record<StateFilter, string> = {
   todos: 'Todos los registros',

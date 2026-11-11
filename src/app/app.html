@@ -47,9 +47,20 @@
         [routerLink]="item.path"
         [queryParams]="nav.query()"
         routerLinkActive="active"
+        [routerLinkActiveOptions]="{
+          paths: 'subset',
+          queryParams: 'ignored',
+          matrixParams: 'ignored',
+          fragment: 'ignored',
+        }"
         ariaCurrentWhenActive="page"
         ><app-ui-icon [name]="item.icon" />
-        <span>{{ item.label }}<small>Próximamente</small></span></a
+        <span
+          >{{ item.label }}
+          @if (item.path !== '/docentes') {
+            <small>Próximamente</small>
+          }
+        </span></a
       >
     }
     @if (nav.profile() === 'sistemas') {
@@ -116,7 +127,7 @@
     <span><b>Periodo</b> {{ nav.periodLabel() }}</span
     ><span><b>Corte</b> {{ nav.cutLabel() }} · Cancún</span
     ><span
-      ><b>Grupo</b> {{ nav.context().grupo === 'todos' ? 'Todos en el ámbito' : 'ENF-301' }} ·
+      ><b>Grupo</b> {{ nav.context().grupo === 'todos' ? 'Todos en el ámbito' : groupLabel() }} ·
       {{
         nav.context().modalidad === 'todas' ? 'Todas las modalidades' : nav.context().modalidad
       }}</span
@@ -138,7 +149,7 @@
         <h1>No pudimos consultar este corte</h1>
         <p>Error simulado. No se muestran ceros ni se mezclan resultados de otros cortes.</p>
         <button type="button" mat-flat-button (click)="store.reload()">Reintentar</button>
-        <button type="button" mat-button (click)="nav.reset()">
+        <button type="button" mat-button (click)="nav.restoreDemoCut()">
           Volver al corte de demostración
         </button>
       </section>

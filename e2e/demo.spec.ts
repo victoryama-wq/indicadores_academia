@@ -213,11 +213,14 @@ test('filtros, carga, vacío, corte incompleto, error y rutas inválidas', async
   await page.goto('/inicio?' + context);
   await ready(page, 'Supervisión académica');
   await page.getByRole('combobox', { name: 'Modalidad', exact: true }).click();
-  await page.getByRole('option', { name: 'Mixta · Sin datos demo', exact: true }).click();
+  await page.getByRole('option', { name: 'Mixta', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'No hay grupos para estos filtros' }),
   ).toBeVisible();
-  await expect(page.getByRole('link', { name: /^registros esperados 0 / })).toBeVisible();
+  await expect(
+    page.locator('.metric').filter({ hasText: 'registros esperados' }).locator('strong'),
+  ).toHaveText('0');
+  await expect(page.locator('.metric[href]')).toHaveCount(0);
   await page.goto('/inicio?' + context.replace('corte=c01', 'corte=c00'));
   await expect(page.getByText('Información incompleta', { exact: true })).toBeVisible();
   await expect(page.locator('.metric')).toHaveCount(0);

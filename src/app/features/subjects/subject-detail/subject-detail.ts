@@ -5,6 +5,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { Metrics } from '../../../shared/metrics/metrics';
+import { subjectRows } from '../../../core/academic-selectors';
+import { countRecords } from '../../../core/models';
 import { QueryStore } from '../../../core/query-store';
 import { NavigationContext } from '../../../core/navigation-context';
 @Component({
@@ -14,23 +16,43 @@ import { NavigationContext } from '../../../core/navigation-context';
   template: `
     <nav class="breadcrumbs" aria-label="Ruta de navegación">
       <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span>/</span
-      ><a routerLink="/grupos/g01" [queryParams]="nav.query()">ENF-301</a
+      ><a
+        [routerLink]="group() ? ['/grupos', group()?.id] : ['/grupos']"
+        [queryParams]="nav.query()"
+        >{{ group()?.name ?? 'Grupos' }}</a
       ><span aria-hidden="true">/</span>Asignatura
     </nav>
-    <a mat-button routerLink="/grupos/g01" [queryParams]="nav.query()"
-      ><app-ui-icon name="arrowLeft" /> Volver al grupo ENF-301</a
+    <a
+      mat-button
+      [routerLink]="group() ? ['/grupos', group()?.id] : ['/grupos']"
+      [queryParams]="nav.query()"
+      ><app-ui-icon name="arrowLeft" /> Volver al grupo {{ group()?.name }}</a
     >
+    @if (nav.originTeacher()) {
+      <a mat-button [routerLink]="['/docentes', nav.originTeacher()]" [queryParams]="nav.query()"
+        >Volver al detalle docente</a
+      >
+    }
     @if (subject(); as s) {
       <section class="panel detail-hero">
         <div>
           <span class="eyebrow">{{ s.code }} · IMPARTICIÓN</span>
           <h1>{{ s.name }}</h1>
-          <p>Licenciatura en Enfermería · ENF-301 · Escolarizada</p>
+          <p>{{ group()?.program }} · {{ group()?.name }} · {{ group()?.modality }}</p>
           <div class="detail-meta">
             <span
               ><small>Docente responsable</small><strong>{{ s.teacher }}</strong></span
-            ><span><small>Actividad incluida</small><strong>1 tarea · Unidad 1</strong></span
-            ><span><small>Población ficticia</small><strong>30 estudiantes</strong></span>
+            ><span
+              ><small>Actividad incluida</small
+              ><strong>{{ activities().length }} actividades</strong></span
+            ><span
+              ><small>Población ficticia</small
+              ><strong>{{
+                store.data()?.status === 'complete'
+                  ? counts().students + ' estudiantes únicos'
+                  : 'No calculable'
+              }}</strong></span
+            >
           </div>
         </div>
         <div class="detail-stamp">
@@ -38,7 +60,10 @@ import { NavigationContext } from '../../../core/navigation-context';
           ><span>Datos simulados</span>
         </div>
       </section>
-      <app-metrics />
+      <app-metrics
+        [records]="records()"
+        [activityId]="activities().length === 1 ? activities()[0].id : undefined"
+      />
       <section class="panel mt-5">
         <div class="panel-heading">
           <div>
@@ -71,7 +96,7 @@ import { NavigationContext } from '../../../core/navigation-context';
               <td mat-cell *matCellDef="let a" data-label="Recibidas">
                 {{
                   store.data()?.status === 'complete'
-                    ? store.counts().received + ' / ' + store.counts().expected
+                    ? a.counts.received + ' / ' + a.counts.expected
                     : 'No calculable'
                 }}
               </td></ng-container
@@ -81,7 +106,7 @@ import { NavigationContext } from '../../../core/navigation-context';
               <td mat-cell *matCellDef="let a" data-label="Calificadas">
                 {{
                   store.data()?.status === 'complete'
-                    ? store.counts().graded + ' / ' + store.counts().received + ' recibidas'
+                    ? a.counts.graded + ' / ' + a.counts.received + ' recibidas'
                     : 'No calculable'
                 }}
               </td></ng-container
@@ -90,8 +115,8 @@ import { NavigationContext } from '../../../core/navigation-context';
               ><th scope="col" mat-header-cell *matHeaderCellDef>Pendientes de calificar</th>
               <td mat-cell *matCellDef="let a" data-label="Pendientes">
                 @if (store.data()?.status === 'complete') {
-                  <span class="pill red">{{ store.counts().overdue }} vencidos</span
-                  ><small>{{ store.counts().within }} en plazo</small>
+                  <span class="pill red">{{ a.counts.overdue }} vencidos</span
+                  ><small>{{ a.counts.within }} en plazo</small>
                 } @else {
                   Información incompleta
                 }
@@ -132,8 +157,12 @@ export class SubjectDetail {
   readonly subject = computed(() =>
     this.store.data()?.subjects.find((s) => s.id === this.params()?.get('imparticionId')),
   );
-  readonly activities = computed(
-    () => this.store.data()?.activities.filter((a) => a.subjectId === this.subject()?.id) ?? [],
+  readonly row = computed(() =>
+    subjectRows(this.store.data()).find((s) => s.id === this.subject()?.id),
   );
+  readonly activities = computed(() => this.row()?.activities ?? []);
+  readonly group = computed(() => this.row()?.group);
+  readonly records = computed(() => this.row()?.records ?? []);
+  readonly counts = computed(() => countRecords(this.records()));
   readonly columns = ['activity', 'received', 'graded', 'pending', 'action'];
 }

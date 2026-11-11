@@ -14,20 +14,37 @@
   <section class="hero-banner">
     <div>
       <span class="eyebrow">CONTINÚA EL RECORRIDO</span>
-      <h2>ENF-301 · Licenciatura en Enfermería</h2>
-      <p>Escolarizada · 1 asignatura · 1 actividad incluida en esta demo</p>
+      <h2>
+        {{
+          store.data()?.groups?.length === 1
+            ? store.data()?.groups?.[0]?.name
+            : 'Grupos de la selección'
+        }}
+      </h2>
+      <p>
+        {{ store.data()?.subjects?.length }} imparticiones ·
+        {{ store.data()?.activities?.length }} actividades de demostración
+      </p>
     </div>
-    <a class="hero-action" mat-flat-button routerLink="/grupos/g01" [queryParams]="nav.query()"
+    <a
+      class="hero-action"
+      mat-flat-button
+      [routerLink]="
+        store.data()?.groups?.length === 1
+          ? ['/grupos', store.data()?.groups?.[0]?.id]
+          : ['/grupos']
+      "
+      [queryParams]="nav.query()"
       >Ver grupos y asignaturas <app-ui-icon name="arrowRight"
     /></a>
   </section>
 }
-<app-metrics />
+<app-metrics [activityId]="singleActivity()" />
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mt-5">
   <section class="panel xl:col-span-2">
     <div class="panel-heading">
       <div>
-        <h2>Desglose por grupo</h2>
+        <h2>Resumen de la selección</h2>
         <p>Personas y registros dentro del mismo corte.</p>
       </div>
       <a mat-button routerLink="/grupos" [queryParams]="nav.query()"
@@ -36,12 +53,12 @@
     </div>
     @if (store.data()?.groups?.length && store.data()?.status === 'complete') {
       <div class="group-summary">
-        <span class="group-monogram" aria-hidden="true">E3</span>
+        <span class="group-monogram" aria-hidden="true">AC</span>
         <div>
-          <h3>Licenciatura en Enfermería</h3>
-          <p>ENF-301 · Escolarizada · {{ store.counts().students }} estudiantes</p>
+          <h3>{{ store.data()?.groups?.length }} grupos en la selección</h3>
+          <p>{{ store.counts().students }} estudiantes únicos · Todos los registros filtrados</p>
         </div>
-        <span class="pill">1 asignatura</span>
+        <span class="pill">{{ store.data()?.subjects?.length }} imparticiones</span>
       </div>
       <div class="progress-grid">
         <div>
@@ -84,7 +101,7 @@
           {{
             store.data()?.status === 'incomplete'
               ? 'No se calculan porcentajes de este corte.'
-              : 'La demo contiene Enfermería, Escolarizada, Unidad 1 y una tarea en 27-1.'
+              : 'La demo contiene Enfermería y Administración, modalidades Escolarizada y Mixta, tareas de Unidad 1 en 27-1.'
           }}
         </p>
       </div>
@@ -117,7 +134,8 @@
 <div class="notice neutral mt-5">
   <strong>Lectura de los indicadores</strong>
   <p>
-    Una persona puede generar varios registros en otras actividades. Esta demo incluye una actividad
-    por estudiante. Plazos y reglas oficiales pendientes de definición de Academia.
+    Una persona puede generar varios registros en otras actividades. Esta demo incluye personas que
+    participan en varias actividades. Plazos y reglas oficiales pendientes de definición de
+    Academia.
   </p>
 </div>

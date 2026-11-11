@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
 import { NavigationContext } from '../../core/navigation-context';
+import { QueryStore } from '../../core/query-store';
 import { QueryContext } from '../../core/models';
 @Component({
   selector: 'app-context-filters',
@@ -17,7 +18,7 @@ import { QueryContext } from '../../core/models';
       ></mat-expansion-panel-header
     >
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      @for (field of fields; track field.key) {
+      @for (field of fields(); track field.key) {
         <mat-form-field appearance="outline" subscriptSizing="dynamic"
           ><mat-label>{{ field.label }}</mat-label
           ><mat-select
@@ -33,18 +34,21 @@ import { QueryContext } from '../../core/models';
     </div>
     <div class="filter-foot">
       <span>Los filtros se aplican al instante y se conservan al navegar.</span
-      ><button type="button" mat-button (click)="nav.reset()">Restablecer filtros</button>
+      ><button type="button" mat-button (click)="nav.resetFilters()">Restablecer filtros</button>
     </div>
   </mat-expansion-panel>`,
 })
 export class ContextFilters {
   readonly nav = inject(NavigationContext);
   readonly desktop = matchMedia('(min-width: 1024px)').matches;
-  readonly fields: {
-    key: keyof QueryContext;
-    label: string;
-    options: { value: string; label: string }[];
-  }[] = [
+  private readonly store = inject(QueryStore);
+  readonly fields = computed<
+    {
+      key: keyof QueryContext;
+      label: string;
+      options: { value: string; label: string }[];
+    }[]
+  >(() => [
     {
       key: 'periodo',
       label: 'Periodo',
@@ -66,7 +70,14 @@ export class ContextFilters {
       key: 'carrera',
       label: 'Carrera',
       options: [
-        { value: 'enf', label: 'Licenciatura en Enfermería' },
+        ...Array.from(
+          new Map(
+            (this.store.data()?.catalog.groups ?? []).map((g) => [
+              g.programId,
+              { value: g.programId, label: g.program },
+            ]),
+          ).values(),
+        ),
         { value: 'todas', label: 'Todas en mi ámbito' },
       ],
     },
@@ -75,7 +86,7 @@ export class ContextFilters {
       label: 'Modalidad',
       options: [
         { value: 'escolarizada', label: 'Escolarizada' },
-        { value: 'mixta', label: 'Mixta · Sin datos demo' },
+        { value: 'mixta', label: 'Mixta' },
         { value: 'todas', label: 'Todas en mi ámbito' },
       ],
     },
@@ -83,7 +94,7 @@ export class ContextFilters {
       key: 'grupo',
       label: 'Grupo',
       options: [
-        { value: 'g01', label: 'ENF-301' },
+        ...(this.store.data()?.catalog.groups ?? []).map((g) => ({ value: g.id, label: g.name })),
         { value: 'todos', label: 'Todos en mi ámbito' },
       ],
     },
@@ -92,7 +103,21 @@ export class ContextFilters {
       label: 'Docente',
       options: [
         { value: 'todos', label: 'Todos en mi ámbito' },
-        { value: 'd01', label: 'Docente Demo A' },
+        ...(this.store.data()?.catalog.teachers ?? []).map((t) => ({ value: t.id, label: t.name })),
+      ],
+    },
+    {
+      key: 'asignatura',
+      label: 'Asignatura e impartición',
+      options: [
+        { value: 'todas', label: 'Todas en mi ámbito' },
+        ...(this.store.data()?.catalog.subjects ?? []).map((s) => ({
+          value: s.id,
+          label:
+            s.name +
+            ' · ' +
+            (this.store.data()?.catalog.groups.find((g) => g.id === s.groupId)?.name ?? s.groupId),
+        })),
       ],
     },
     {
@@ -113,7 +138,7 @@ export class ContextFilters {
         { value: 'u02', label: 'Unidad 2 · Sin datos demo' },
       ],
     },
-  ];
+  ]);
   change(key: keyof QueryContext, value: string) {
     void this.nav.update({
       [key]: value,

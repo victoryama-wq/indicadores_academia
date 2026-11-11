@@ -1,5 +1,6 @@
 import { UiIcon } from '../ui-icon/ui-icon';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { countRecords, TrackingRecord } from '../../core/models';
 import { RouterLink } from '@angular/router';
 import { QueryStore } from '../../core/query-store';
 import { NavigationContext } from '../../core/navigation-context';
@@ -19,16 +20,24 @@ import { NavigationContext } from '../../core/navigation-context';
     } @else {
       <div class="metrics-grid grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         @for (item of items(); track item.label) {
-          <a
-            class="metric"
-            [class.metric-alert]="item.state === 'pendiente'"
-            routerLink="/actividades/a01"
-            (click)="nav.setStudentSearch('')"
-            [queryParams]="nav.query({ estado: item.state, pagina: 0 })"
-            ><div class="metric-label">{{ item.label }}<app-ui-icon name="arrowRight" /></div>
-            <strong>{{ item.value }}</strong
-            ><span class="metric-caption">{{ item.note }}</span></a
-          >
+          @if (activityId(); as id) {
+            <a
+              class="metric"
+              [class.metric-alert]="item.state === 'pendiente'"
+              [routerLink]="['/actividades', id]"
+              (click)="nav.setStudentSearch('', id)"
+              [queryParams]="nav.query({ estado: item.state, pagina: 0 })"
+              ><div class="metric-label">{{ item.label }}<app-ui-icon name="arrowRight" /></div>
+              <strong>{{ item.value }}</strong
+              ><span class="metric-caption">{{ item.note }}</span></a
+            >
+          } @else {
+            <div class="metric" [class.metric-alert]="item.state === 'pendiente'">
+              <div class="metric-label">{{ item.label }}</div>
+              <strong>{{ item.value }}</strong>
+              <span class="metric-caption">{{ item.note }}</span>
+            </div>
+          }
         }
       </div>
     }
@@ -37,8 +46,10 @@ import { NavigationContext } from '../../core/navigation-context';
 export class Metrics {
   readonly store = inject(QueryStore);
   readonly nav = inject(NavigationContext);
+  readonly records = input<readonly TrackingRecord[]>();
+  readonly activityId = input<string>();
   readonly items = computed(() => {
-    const c = this.store.counts();
+    const c = countRecords(this.records() ?? this.store.data()?.records ?? []);
     return [
       {
         label: 'estudiantes únicos',

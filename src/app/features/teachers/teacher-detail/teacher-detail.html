@@ -1,0 +1,145 @@
+<nav class="breadcrumbs" aria-label="Ruta de navegación">
+  <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span aria-hidden="true">/</span
+  ><a routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
+    >Seguimiento docente</a
+  ><span aria-hidden="true">/</span>Detalle
+</nav>
+<a mat-button routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
+  ><app-ui-icon name="arrowLeft" /> Volver al listado de docentes</a
+>
+@if (teacher(); as t) {
+  <section class="panel detail-hero">
+    <div>
+      <span class="eyebrow">RESPONSABILIDAD SIMULADA · SOLO CONSULTA</span>
+      <h1>{{ t.name }}</h1>
+      <p>Periodo {{ nav.periodLabel() }} · {{ nav.cutLabel() }}</p>
+      <div class="detail-meta">
+        <span
+          ><small>Grupos en la selección</small
+          ><strong>{{ summary()?.groups?.length ?? 0 }}</strong></span
+        ><span
+          ><small>Imparticiones en la selección</small
+          ><strong>{{ summary()?.subjects?.length ?? 0 }}</strong></span
+        >
+      </div>
+    </div>
+    <span class="pill green">Datos ficticios</span>
+  </section>
+  @if (summary(); as row) {
+    <p class="count-explanation">
+      Personas únicas dentro de esta selección; las entregas se cuentan por par
+      estudiante–actividad. Un estudiante puede tener varias entregas.
+    </p>
+    <app-metrics [records]="row.records" />
+    <h2 class="breakdown-title">Desglose por grupo y asignatura</h2>
+    @for (s of row.subjects; track s.id) {
+      <section class="panel mb-5" [attr.data-testid]="'assignment-' + s.id">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">{{ s.group?.name }} · {{ s.group?.modality }}</span>
+            <h3>{{ s.name }}</h3>
+            <p>{{ s.group?.program }} · {{ s.code }}</p>
+          </div>
+          <a
+            mat-button
+            [routerLink]="['/asignaturas', s.id]"
+            [queryParams]="nav.query({ origenDocente: t.id })"
+            >Abrir asignatura <app-ui-icon name="arrowRight"
+          /></a>
+        </div>
+        @if (store.data()?.status === 'complete') {
+          <div class="assignment-summary">
+            <span>{{ s.counts.students }} estudiantes únicos</span
+            ><span>{{ s.counts.graded }} entregas calificadas</span
+            ><strong>{{ s.counts.pending }} entregas pendientes</strong
+            ><span>{{ s.counts.overdue }} vencidas · {{ s.counts.within }} en plazo</span>
+          </div>
+          <div
+            class="table-scroll overflow-x-auto"
+            tabindex="0"
+            role="region"
+            [attr.aria-label]="'Actividades de ' + s.name"
+          >
+            <table
+              mat-table
+              [dataSource]="s.activities"
+              class="responsive-table"
+              [attr.aria-label]="'Actividades de ' + s.name"
+            >
+              <ng-container matColumnDef="activity"
+                ><th mat-header-cell *matHeaderCellDef scope="col">Actividad</th>
+                <td mat-cell *matCellDef="let a" data-label="Actividad">
+                  <strong>{{ a.name }}</strong
+                  ><small>{{ a.type }} · {{ a.unit }}</small>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="graded"
+                ><th mat-header-cell *matHeaderCellDef scope="col">Entregas calificadas</th>
+                <td mat-cell *matCellDef="let a" data-label="Calificadas">
+                  {{ a.counts.graded }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="pending"
+                ><th mat-header-cell *matHeaderCellDef scope="col">Entregas pendientes</th>
+                <td mat-cell *matCellDef="let a" data-label="Pendientes">
+                  {{ a.counts.pending }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="deadline"
+                ><th mat-header-cell *matHeaderCellDef scope="col">Plazo de pendientes</th>
+                <td mat-cell *matCellDef="let a" data-label="Plazo">
+                  <span>{{ a.counts.overdue }} vencidas · {{ a.counts.within }} en plazo</span>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="action"
+                ><th mat-header-cell *matHeaderCellDef scope="col">Consulta</th>
+                <td mat-cell *matCellDef="let a" data-label="Consulta">
+                  <a
+                    mat-button
+                    [routerLink]="['/actividades', a.id]"
+                    [queryParams]="
+                      nav.query({ estado: 'pendiente', pagina: 0, origenDocente: t.id })
+                    "
+                    (click)="nav.setStudentSearch('', a.id)"
+                    [attr.aria-label]="'Ver pendientes de ' + a.name"
+                    >Ver pendientes <app-ui-icon name="arrowRight"
+                  /></a></td
+              ></ng-container>
+              <tr mat-header-row *matHeaderRowDef="columns"></tr>
+              <tr mat-row *matRowDef="let activity; columns: columns"></tr>
+            </table>
+          </div>
+        } @else {
+          <p class="p-5">Totales no calculables para este corte incompleto.</p>
+        }
+      </section>
+    }
+  } @else {
+    <section class="panel empty" role="status">
+      <h2>Sin resultados para este docente</h2>
+      <p>
+        El docente existe en el catálogo ficticio, pero no tiene imparticiones en los filtros
+        seleccionados.
+      </p>
+      <a mat-button routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
+        >Revisar filtros del listado</a
+      >
+    </section>
+  }
+  <div class="notice neutral mt-5">
+    <strong>Supuestos por validar con Academia</strong>
+    <p>
+      Una persona responsable por impartición, pares estudiante–actividad precargados y plazos fijos
+      al corte. No se atribuyen responsabilidades institucionales ni se compara el desempeño entre
+      docentes.
+    </p>
+  </div>
+} @else {
+  <section class="panel empty">
+    <h1>Docente no disponible</h1>
+    <p>El identificador no corresponde a un docente del catálogo ficticio.</p>
+    <a mat-button routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
+      >Consultar docentes</a
+    >
+  </section>
+}

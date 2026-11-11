@@ -29,7 +29,18 @@ export const routes: Routes = [
     title: 'Ficha de seguimiento · Academia',
     loadComponent: () => import('./features/followup/followup/followup').then((m) => m.Followup),
   },
-  ...['docentes', 'reportes', 'historicos', 'calidad'].map((path) => ({
+  {
+    path: 'docentes',
+    title: 'Seguimiento docente · Academia',
+    loadComponent: () => import('./features/teachers/teachers/teachers').then((m) => m.Teachers),
+  },
+  {
+    path: 'docentes/:docenteId',
+    title: 'Docente · Academia',
+    loadComponent: () =>
+      import('./features/teachers/teacher-detail/teacher-detail').then((m) => m.TeacherDetail),
+  },
+  ...['reportes', 'historicos', 'calidad'].map((path) => ({
     path,
     title: 'Próximamente · Academia',
     data: {

@@ -1,0 +1,13 @@
+.assignment {
+  display: block;
+  margin-block: 5px;
+}
+mat-form-field {
+  width: min(100%, 340px);
+}
+.list-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}

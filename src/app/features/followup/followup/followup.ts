@@ -13,12 +13,15 @@ import { NavigationContext } from '../../../core/navigation-context';
   template: `
     <nav class="breadcrumbs" aria-label="Ruta de navegación">
       <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span>/</span
-      ><a routerLink="/actividades/a01" [queryParams]="nav.recordQuery()">Plan de cuidados</a
+      ><a
+        [routerLink]="activity() ? ['/actividades', activity()?.id] : ['/grupos']"
+        [queryParams]="nav.recordQuery()"
+        >{{ activity()?.name ?? 'Grupos' }}</a
       ><span aria-hidden="true">/</span>Ficha de seguimiento
     </nav>
     <a
       mat-button
-      routerLink="/actividades/a01"
+      [routerLink]="activity() ? ['/actividades', activity()?.id] : ['/grupos']"
       [queryParams]="nav.recordQuery()"
       fragment="estudiantes"
       ><app-ui-icon name="arrowLeft" /> Volver al listado de estudiantes</a
@@ -28,7 +31,7 @@ import { NavigationContext } from '../../../core/navigation-context';
         <div>
           <span class="eyebrow">FICHA INDIVIDUAL · DATOS SIMULADOS</span>
           <h1>{{ r.studentName }}</h1>
-          <p>{{ r.registration }} · ENF-301 · Licenciatura en Enfermería</p>
+          <p>{{ r.registration }} · {{ group()?.name }} · {{ group()?.program }}</p>
         </div>
         <span
           class="pill"
@@ -46,19 +49,19 @@ import { NavigationContext } from '../../../core/navigation-context';
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <section class="panel p-6">
           <span class="eyebrow">CONTEXTO ACADÉMICO</span>
-          <h2>Plan de cuidados</h2>
+          <h2>{{ activity()?.name }}</h2>
           <dl class="facts">
             <div>
               <dt>Asignatura</dt>
-              <dd>Enfermería Clínica · ENF-304</dd>
+              <dd>{{ subject()?.name }} · {{ subject()?.code }}</dd>
             </div>
             <div>
               <dt>Docente responsable</dt>
-              <dd>Docente Demo A</dd>
+              <dd>{{ subject()?.teacher }}</dd>
             </div>
             <div>
               <dt>Periodo y modalidad</dt>
-              <dd>{{ nav.periodLabel() }} · Escolarizada</dd>
+              <dd>{{ nav.periodLabel() }} · {{ group()?.modality }}</dd>
             </div>
             <div>
               <dt>Corte consultado</dt>
@@ -129,8 +132,11 @@ import { NavigationContext } from '../../../core/navigation-context';
       <section class="panel empty">
         <h1>Recurso no disponible</h1>
         <p>El registro no existe o no tiene información en este corte y ámbito.</p>
-        <a mat-button routerLink="/actividades/a01" [queryParams]="nav.recordQuery()"
-          >Volver a la actividad</a
+        <a
+          mat-button
+          [routerLink]="activity() ? ['/actividades', activity()?.id] : ['/grupos']"
+          [queryParams]="nav.recordQuery()"
+          >Volver a la consulta</a
         >
       </section>
     }
@@ -142,5 +148,14 @@ export class Followup {
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   readonly record = computed(() =>
     this.store.data()?.records.find((r) => r.id === this.params()?.get('registroId')),
+  );
+  readonly activity = computed(() =>
+    this.store.data()?.activities.find((a) => a.id === this.record()?.activityId),
+  );
+  readonly subject = computed(() =>
+    this.store.data()?.subjects.find((s) => s.id === this.activity()?.subjectId),
+  );
+  readonly group = computed(() =>
+    this.store.data()?.groups.find((g) => g.id === this.subject()?.groupId),
   );
 }
