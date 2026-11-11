@@ -60,6 +60,13 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Evitar el espejo APT de Azure con fallos de DNS
+        run: |
+          # Conserva los espejos oficiales archive.ubuntu.com y security.ubuntu.com.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
+          fi
+
       - name: Instalar Microsoft Edge y dependencias del sistema
         run: npx playwright install --with-deps msedge
 
