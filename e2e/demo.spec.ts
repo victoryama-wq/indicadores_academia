@@ -24,7 +24,7 @@ for (const width of [1440, 1280, 1024, 768, 640, 375, 320]) {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/inicio?' + context);
-    await ready(page, 'Supervisión académica');
+    await ready(page, 'Seguimiento a plataforma Moodle');
     await expect(page.locator('app-profile-selector mat-label')).toBeVisible();
     await audit(page);
     await test.info().attach('inicio', {
@@ -131,7 +131,7 @@ test('búsqueda, orden y página sobreviven a ficha, regreso y recarga', async (
 test('teclado: salto al contenido, foco del menú y cambio a escritorio', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto('/inicio?' + context);
-  await ready(page, 'Supervisión académica');
+  await ready(page, 'Seguimiento a plataforma Moodle');
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Saltar al contenido' })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -184,7 +184,7 @@ test('cifras abren sus registros y cero es calificación', async ({ page }) => {
 });
 test('perfiles, menú administrativo y rechazo de acceso directo', async ({ page }) => {
   await page.goto('/inicio');
-  await ready(page, 'Supervisión académica');
+  await ready(page, 'Seguimiento a plataforma Moodle');
   const profile = page.getByRole('combobox', { name: 'Perfil simulado' });
   await profile.focus();
   await profile.press('Enter');
@@ -207,11 +207,11 @@ test('perfiles, menú administrativo y rechazo de acceso directo', async ({ page
   await expect(page.getByText('PRÓXIMAMENTE', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Perfil simulado' }).click();
   await page.getByRole('option', { name: 'Coordinación', exact: true }).click();
-  await ready(page, 'Supervisión académica');
+  await ready(page, 'Seguimiento a plataforma Moodle');
 });
 test('filtros, carga, vacío, corte incompleto, error y rutas inválidas', async ({ page }) => {
   await page.goto('/inicio?' + context);
-  await ready(page, 'Supervisión académica');
+  await ready(page, 'Seguimiento a plataforma Moodle');
   await page.getByRole('combobox', { name: 'Modalidad', exact: true }).click();
   await page.getByRole('option', { name: 'Mixta', exact: true }).click();
   await expect(
@@ -228,7 +228,7 @@ test('filtros, carga, vacío, corte incompleto, error y rutas inválidas', async
   await ready(page, 'No pudimos consultar este corte');
   await expect(page.locator('.metric')).toHaveCount(0);
   await page.getByRole('button', { name: 'Volver al corte de demostración' }).click();
-  await ready(page, 'Supervisión académica');
+  await ready(page, 'Seguimiento a plataforma Moodle');
   for (const route of [
     '/grupos/no-existe',
     '/asignaturas/no-existe',

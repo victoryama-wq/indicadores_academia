@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "tipo": "spai",
+  "ciclo": "p02",
+  "filas": [
+    {
+      "ciclo": "p02",
+      "cursoId": "demo-curso",
+      "estudianteId": "demo-e01",
+      "estudiante": "Estudiante Ficticio 01",
+      "matricula": "DEMO-01"
+    }
+  ]
+}

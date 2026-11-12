@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "tipo": "calificaciones",
+  "ciclo": "p02",
+  "filas": [
+    {
+      "ciclo": "p02",
+      "cursoId": "demo-curso",
+      "actividadId": "demo-tarea",
+      "estudianteId": "demo-e01",
+      "entregaEn": "2027-03-04T12:00:00-05:00",
+      "calificacion": 0,
+      "calificadaEn": "2027-03-05T12:00:00-05:00"
+    }
+  ]
+}

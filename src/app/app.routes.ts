@@ -1,6 +1,11 @@
 import { inject } from '@angular/core';
 import { Routes, Router } from '@angular/router';
 import { NavigationContext } from './core/navigation-context';
+const systemsOnly = () =>
+  inject(NavigationContext).profile() === 'sistemas' ||
+  inject(Router).createUrlTree(['/restringido'], {
+    queryParams: inject(NavigationContext).query(),
+  });
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'inicio' },
   {
@@ -40,7 +45,19 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/teachers/teacher-detail/teacher-detail').then((m) => m.TeacherDetail),
   },
-  ...['reportes', 'historicos', 'calidad'].map((path) => ({
+  {
+    path: 'reportes',
+    title: 'Reportes · Academia',
+    loadComponent: () => import('./features/reports/reports/reports').then((m) => m.Reports),
+  },
+  {
+    path: 'admin/insumos',
+    title: 'Insumos por ciclo · Academia',
+    canActivate: [systemsOnly],
+    loadComponent: () =>
+      import('./features/admin/cycle-inputs/cycle-inputs').then((m) => m.CycleInputs),
+  },
+  ...['historicos', 'calidad'].map((path) => ({
     path,
     title: 'Próximamente · Academia',
     data: {
@@ -59,13 +76,7 @@ export const routes: Routes = [
   })),
   {
     path: 'admin/:section',
-    canActivate: [
-      () =>
-        inject(NavigationContext).profile() === 'sistemas' ||
-        inject(Router).createUrlTree(['/restringido'], {
-          queryParams: inject(NavigationContext).query(),
-        }),
-    ],
+    canActivate: [systemsOnly],
     data: { kind: 'upcoming', label: 'Administración e integración' },
     loadComponent: () =>
       import('./features/system/status-page/status-page').then((m) => m.StatusPage),
