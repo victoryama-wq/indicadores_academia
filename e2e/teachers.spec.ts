@@ -49,6 +49,7 @@ test('la búsqueda de estudiantes se conserva por actividad sin contaminar otro 
   await page.goto('/actividades/a02?' + context);
   await expect(search).toHaveValue('019');
   await page.getByRole('link', { name: 'Ver ficha de Estudiante Demo 019' }).click();
+  await expect(page).toHaveURL(/\/seguimiento\/a02-e019(?:\?|$)/);
   await page.reload();
   await page.getByRole('link', { name: 'Volver al listado de estudiantes' }).click();
   await expect(search).toHaveValue('019');

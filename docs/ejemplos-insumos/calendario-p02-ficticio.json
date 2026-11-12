@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "tipo": "calendario",
+  "ciclo": "p02",
+  "filas": [
+    {
+      "ciclo": "p02",
+      "cursoId": "demo-curso",
+      "asignatura": "Curso ficticio de demostración",
+      "grupoId": "demo-grupo",
+      "grupo": "DEMO-01",
+      "carreraId": "adm",
+      "carrera": "Licenciatura en Administración",
+      "modalidad": "ejecutiva",
+      "docenteId": "d04",
+      "docente": "Docente Demo D",
+      "actividadId": "demo-tarea",
+      "actividad": "Tarea de demostración",
+      "tipo": "tarea",
+      "unidad": "u01",
+      "apertura": "2027-03-01T08:00:00-05:00",
+      "entrega": null,
+      "corte": "2027-03-05T23:59:00-05:00",
+      "recordarmeCalificar": "2027-03-02T08:00:00-05:00",
+      "propedeutico": false,
+      "pesoTarea": 40,
+      "pesoIntegradora": 30,
+      "pesoForo": 10,
+      "pesoExamen": 20
+    }
+  ]
+}

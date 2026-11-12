@@ -26,7 +26,9 @@ export class NavigationContext {
     const p = this.params();
     return Object.fromEntries(
       Object.entries(
-        this.router.url.startsWith('/docentes') ? TEACHER_CONTEXT : DEFAULT_CONTEXT,
+        /^\/(docentes|reportes|admin\/insumos)/.test(this.router.url)
+          ? TEACHER_CONTEXT
+          : DEFAULT_CONTEXT,
       ).map(([key, value]) => [key, String(p[key] ?? value)]),
     ) as unknown as QueryContext;
   });
@@ -41,14 +43,16 @@ export class NavigationContext {
     this.context().periodo === 'p01'
       ? '27-1 · Sep–Dic 2026'
       : this.context().periodo === 'p02'
-        ? '27-2 · Sin datos demo'
+        ? '27-2 · Preparación'
         : 'Periodo no disponible',
   );
   readonly cutLabel = computed(
     () =>
-      ({ c01: '06 nov 2026 · 23:59 h', c00: '30 oct 2026 · Incompleto', error: 'Error simulado' })[
-        this.context().corte
-      ] ?? 'Corte no disponible',
+      ({
+        c01: this.context().periodo === 'p02' ? '06 mar 2027 · 23:59 h' : '06 nov 2026 · 23:59 h',
+        c00: 'Corte incompleto',
+        error: 'Error simulado',
+      })[this.context().corte] ?? 'Corte no disponible',
   );
   readonly state = computed<StateFilter>(() =>
     Object.hasOwn(STATE_LABELS, this.params()['estado'])
@@ -84,6 +88,8 @@ export class NavigationContext {
   query(extra: Params = {}): Params {
     return {
       ...this.context(),
+      ...(this.params()['reporte'] ? { reporte: this.params()['reporte'] } : {}),
+      ...(this.params()['extemporaneas'] ? { extemporaneas: this.params()['extemporaneas'] } : {}),
       ...(this.originTeacher() ? { origenDocente: this.originTeacher() } : {}),
       ...extra,
     };
@@ -116,10 +122,18 @@ export class NavigationContext {
     return this.router.navigate(['/inicio'], { queryParams: DEFAULT_CONTEXT });
   }
   resetFilters() {
+    if (this.router.url.startsWith('/reportes'))
+      return this.update({
+        ...TEACHER_CONTEXT,
+        periodo: this.context().periodo,
+        extemporaneas: 'todas',
+      });
     return this.router.url.startsWith('/docentes') ? this.resetTeachers() : this.reset();
   }
   restoreDemoCut() {
-    return this.router.url.startsWith('/docentes') ? this.update({ corte: 'c01' }) : this.reset();
+    return /^\/(docentes|reportes|admin\/insumos)/.test(this.router.url)
+      ? this.update({ corte: 'c01' })
+      : this.reset();
   }
   resetTeachers() {
     this.setTeacherSearch('');

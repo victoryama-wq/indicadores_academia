@@ -1,0 +1,346 @@
+<nav class="breadcrumbs" aria-label="Ruta de navegación">
+  <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a
+  ><span aria-hidden="true">/</span>Reportes
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">SEGUIMIENTO A PLATAFORMA MOODLE</span>
+    <h1>Reportes</h1>
+    <p>Consultas con datos ficticios · Ciclo en operación: 27-1.</p>
+  </div>
+  <span class="pill green">Demostración local</span>
+</div>
+@if (inputs.status() === 'loading') {
+  <section class="panel empty" role="status"><h2>Cargando insumos ficticios…</h2></section>
+} @else if (inputs.status() === 'error') {
+  <section class="panel empty" role="alert">
+    <h2>No se pudieron leer los insumos</h2>
+    <p>Recarga la página para reintentar. No se muestran totales sin evidencia.</p>
+  </section>
+} @else {
+  <app-context-filters [reportMode]="true" [catalog]="report().catalog" />
+  <section class="panel p-5 mb-5" aria-label="Consulta y entregas extemporáneas">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"
+        ><mat-label>Consulta</mat-label
+        ><mat-select [value]="view()" (selectionChange)="nav.update({ reporte: $event.value })">
+          <mat-option value="estudiantes">Estudiantes con tarea calificada</mat-option
+          ><mat-option value="entregas">Entregas calificadas frente a pendientes</mat-option
+          ><mat-option value="docentes">Docentes con pendientes</mat-option>
+        </mat-select></mat-form-field
+      >
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"
+        ><mat-label>Entregas extemporáneas</mat-label
+        ><mat-select
+          [value]="late()"
+          (selectionChange)="nav.update({ extemporaneas: $event.value })"
+          ><mat-option value="todas">Todas las clasificaciones</mat-option>
+          @for (o of lateOptions; track o.value) {
+            <mat-option [value]="o.value">{{ o.label }}</mat-option>
+          }
+        </mat-select></mat-form-field
+      >
+    </div>
+    <p class="mt-3">
+      Evidencia al {{ cut() | date: 'dd MMM yyyy, HH:mm' : '-0500' }} (Cancún). El corte de consulta
+      es fijo; no depende del día de ejecución.
+    </p>
+  </section>
+  @if (inputs.storageWarning()) {
+    <div class="notice warning mb-5" role="alert">{{ inputs.storageWarning() }}</div>
+  }
+  @if (nav.context().corte !== 'c01') {
+    <section class="panel empty" role="status">
+      <h2>Corte sin información suficiente</h2>
+      <p>No se calculan indicadores para este corte de demostración.</p>
+    </section>
+  } @else {
+    <section class="panel p-5 mb-5" aria-label="Versiones usadas en el reporte">
+      <h2>Insumos de este ciclo</h2>
+      <div class="version-list">
+        @for (v of versions(); track v.type) {
+          <span class="pill"
+            >{{ inputLabels[v.type] }} ·
+            {{ v.version ? 'v' + v.version.version : 'Sin carga' }}</span
+          >
+        }
+      </div>
+      <p>
+        Solo se cruzan versiones del ciclo seleccionado.
+        @if (nav.profile() === 'sistemas') {
+          <a routerLink="/admin/insumos" [queryParams]="nav.query()">Revisar insumos por ciclo</a>
+        }
+      </p>
+    </section>
+    @if (missingWithdrawals()) {
+      <div class="notice warning mb-5">
+        Sin movimientos de bajas cargados. La población es provisional.
+      </div>
+    }
+    @if (report().missingSources.length) {
+      <div class="notice warning mb-5" role="status">
+        <strong>Información incompleta · Totales no calculables</strong>
+        <p>
+          Faltan: {{ missingSourceLabels() }}. Puedes revisar el calendario sin cargar los demás
+          archivos.
+        </p>
+      </div>
+    } @else {
+      <div
+        class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5"
+        aria-label="Resumen del contexto filtrado"
+      >
+        <div class="panel metric-card">
+          <span>Estudiantes únicos</span
+          ><strong data-testid="report-people">{{ report().counts.students }}</strong
+          ><small>Personas distintas en la selección</small>
+        </div>
+        <div class="panel metric-card">
+          <span>Entregas calificadas</span
+          ><strong data-testid="report-graded">{{ report().counts.graded }}</strong
+          ><small>Pares estudiante–actividad</small>
+        </div>
+        <div class="panel metric-card">
+          <span>Entregas pendientes</span
+          ><strong data-testid="report-pending">{{ report().counts.pending }}</strong
+          ><small>Recibidas sin calificar al corte</small>
+        </div>
+        <div class="panel metric-card">
+          <span>Avance de calificación</span
+          ><strong>{{
+            report().counts.progress === null ? 'No aplica' : report().counts.progress + '%'
+          }}</strong
+          ><small
+            >{{ report().counts.graded }} /
+            {{ report().counts.graded + report().counts.pending }} entregas recibidas · no es
+            ponderación</small
+          >
+        </div>
+      </div>
+      <p class="mb-5" role="status" data-testid="report-summary">
+        {{ report().counts.pairs }} pares · {{ report().counts.missing }} sin entrega ·
+        {{ report().counts.unknown }} sin evidencia · {{ report().counts.late }} extemporáneas ·
+        {{ report().counts.noRule }} sin criterio configurado
+      </p>
+      @if (!report().complete) {
+        <div class="notice warning mb-5">
+          <strong>Cobertura parcial</strong>
+          <p>
+            Las cifras describen solo la evidencia disponible, no la cobertura institucional. Hay
+            registros sin evidencia o correspondencias pendientes.
+          </p>
+        </div>
+      }
+      @if (!report().records.length) {
+        <section class="panel empty mb-5">
+          <h2>Sin resultados para estos filtros</h2>
+          <p>La selección no contiene registros; no se recuperan datos de otro ciclo.</p>
+          <button mat-button type="button" (click)="nav.resetFilters()">Restablecer filtros</button>
+        </section>
+      } @else {
+        <section class="panel mb-5">
+          @if (view() === 'estudiantes') {
+            <div class="panel-heading">
+              <div>
+                <h2>Estudiantes con tarea calificada</h2>
+                <p data-testid="graded-students">
+                  {{ report().students.length }} estudiantes únicos. Una persona con varias tareas
+                  aparece una sola vez. Integradora, foro y examen se cuentan por separado.
+                </p>
+              </div>
+            </div>
+            <table class="report-table" aria-label="Estudiantes con tarea calificada">
+              <thead>
+                <tr>
+                  <th scope="col">Estudiante</th>
+                  <th scope="col">Matrícula ficticia</th>
+                  <th scope="col">Tareas calificadas</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of report().students; track s.estudianteId) {
+                  <tr>
+                    <td data-label="Estudiante">{{ s.estudiante }}</td>
+                    <td data-label="Matrícula">{{ s.matricula }}</td>
+                    <td data-label="Tareas calificadas">{{ s.tasks }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="3">
+                      No hay estudiantes con tarea calificada para esta selección.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else if (view() === 'docentes') {
+            <div class="panel-heading">
+              <div>
+                <h2>Docentes con pendientes</h2>
+                <p>
+                  {{ report().teachers.length }} docentes distintos. Las cifras se calculan
+                  exclusivamente dentro del contexto filtrado.
+                </p>
+              </div>
+            </div>
+            <table class="report-table" aria-label="Docentes con pendientes">
+              <thead>
+                <tr>
+                  <th scope="col">Docente y cursos</th>
+                  <th scope="col">Estudiantes únicos</th>
+                  <th scope="col">Calificadas</th>
+                  <th scope="col">Pendientes</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of report().teachers; track t.id) {
+                  <tr>
+                    <td data-label="Docente">
+                      {{ t.name }}<small>{{ t.courses.join(' / ') }}</small>
+                    </td>
+                    <td data-label="Estudiantes únicos">{{ t.students }}</td>
+                    <td data-label="Calificadas">{{ t.graded }}</td>
+                    <td data-label="Pendientes">{{ t.pending }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="4">No hay docentes con pendientes en esta selección.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <div class="panel-heading">
+              <div>
+                <h2>Entregas calificadas frente a pendientes</h2>
+                <p>Una entrega se cuenta por estudiante y actividad, no por número de intentos.</p>
+              </div>
+            </div>
+            <table class="report-table" aria-label="Desglose por tipo de actividad">
+              <thead>
+                <tr>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Calificadas</th>
+                  <th scope="col">Pendientes</th>
+                  <th scope="col">Sin entrega</th>
+                  <th scope="col">Sin evidencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of report().types; track t.type) {
+                  <tr>
+                    <th scope="row">{{ labels[t.type] }}</th>
+                    <td data-label="Calificadas">{{ t.graded }}</td>
+                    <td data-label="Pendientes">{{ t.pending }}</td>
+                    <td data-label="Sin entrega">{{ t.missing }}</td>
+                    <td data-label="Sin evidencia">{{ t.unknown }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      }
+    }
+    <section class="panel p-5 mb-5">
+      <h2>Ponderación configurada por curso</h2>
+      <p>
+        Porcentajes de evaluación precargados o importados. No representan avance ni una
+        calificación final calculada.
+      </p>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        @for (c of courses(); track c.cursoId) {
+          <article class="course-card">
+            <h3>{{ c.asignatura }} · {{ c.grupo }}</h3>
+            <p>{{ weight(c) }}</p>
+            @if (c.propedeutico) {
+              <span class="pill">Calendario pendiente</span>
+            }
+          </article>
+        } @empty {
+          <p>No hay cursos en el calendario para esta selección.</p>
+        }
+      </div>
+    </section>
+    <section class="panel mb-5">
+      <div class="panel-heading">
+        <div>
+          <h2>Calendario y detalle por actividad</h2>
+          <p>
+            Ejecutiva, Virtual y Posgrados: apertura y corte como cierre. Escolarizada: entrega y
+            corte distintos. “Recordarme calificar” es un recordatorio interno, no modifica el
+            plazo.
+          </p>
+        </div>
+      </div>
+      <div class="activity-grid p-5">
+        @for (a of report().activities; track a.cursoId + ':' + a.actividadId) {
+          <article class="course-card">
+            <span class="eyebrow">{{ a.grupo }} · {{ a.modalidad }}</span>
+            <h3>{{ a.actividad }}</h3>
+            <p>
+              {{ a.asignatura }} · {{ labels[a.tipo] }} ·
+              {{ a.unidad === 'u01' ? 'Unidad 1' : 'Unidad 2' }}
+            </p>
+            <span class="pill">{{ closingRule(a) }}</span>
+            <dl>
+              <dt>Apertura</dt>
+              <dd>
+                {{
+                  a.apertura
+                    ? (a.apertura | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                    : 'Sin criterio configurado'
+                }}
+              </dd>
+              <dt>Fecha de entrega</dt>
+              <dd>
+                {{
+                  a.entrega ? (a.entrega | date: 'dd/MM/yyyy HH:mm' : '-0500') : 'No configurada'
+                }}
+              </dd>
+              <dt>Fecha de corte / cierre</dt>
+              <dd>
+                {{
+                  a.corte
+                    ? (a.corte | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                    : 'Sin criterio configurado'
+                }}
+              </dd>
+              <dt>Recordarme calificar · interno</dt>
+              <dd>
+                {{
+                  a.recordarmeCalificar
+                    ? (a.recordarmeCalificar | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                    : 'No configurado'
+                }}
+              </dd>
+            </dl>
+            @if (!report().missingSources.length) {
+              <p>
+                {{ a.graded }} calificadas · {{ a.pending }} pendientes · {{ a.late }} extemporáneas
+              </p>
+            }
+          </article>
+        }
+      </div>
+    </section>
+    @if (report().issues.length) {
+      <section class="notice warning mb-5">
+        <h2>Correspondencias pendientes</h2>
+        <ul>
+          @for (issue of report().issues; track $index) {
+            <li>{{ issue }}</li>
+          }
+        </ul>
+      </section>
+    }
+    <div class="notice neutral">
+      <strong>Supuestos de demostración por validar con Academia</strong>
+      <p>
+        Inscripción por curso, exclusión de bajas efectivas al corte ({{ report().excluded }} pares
+        excluidos), ponderación y equivalencias del libro son propuestas. “Mixta” no se equipara a
+        Ejecutiva. No se atribuyen responsabilidades institucionales ni se envían recordatorios.
+      </p>
+    </div>
+  }
+}

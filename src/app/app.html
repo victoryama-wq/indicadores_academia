@@ -57,7 +57,7 @@
         ><app-ui-icon [name]="item.icon" />
         <span
           >{{ item.label }}
-          @if (item.path !== '/docentes') {
+          @if (item.path !== '/docentes' && item.path !== '/reportes') {
             <small>Próximamente</small>
           }
         </span></a
@@ -65,6 +65,13 @@
     }
     @if (nav.profile() === 'sistemas') {
       <p class="nav-label">ADMINISTRACIÓN · SISTEMAS</p>
+      <a
+        routerLink="/admin/insumos"
+        [queryParams]="nav.query()"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        ><app-ui-icon name="settings" /><span>Insumos por ciclo</span></a
+      >
       <a
         routerLinkActive="active"
         ariaCurrentWhenActive="page"

@@ -35,19 +35,21 @@ El artefacto `playwright-edge` conserva `playwright-report/` y `test-results/` d
 
 ## Recorrido
 
-| Ruta | Resultado |
-| --- | --- |
-| `/inicio` | Periodo, corte, filtros, indicadores y acceso al grupo |
-| `/grupos` | Grupos de la selección |
-| `/grupos/g01` | ENF-301, asignatura y docente |
-| `/asignaturas/i01` | Enfermería Clínica, clave visible ENF-304, actividad |
-| `/actividades/a01` | Plan de cuidados, resumen y registros |
-| `/actividades/a01?estado=pendiente` | Exactamente 6 pendientes: 4 vencidos y 2 en plazo |
-| `/docentes` | Listado docente con búsqueda, filtros y entregas por responsable |
-| `/docentes/d01` | Docente A: dos grupos y dos imparticiones, con desglose por actividad |
-| `/seguimiento/r019` | Ficha individual de un pendiente vencido |
-| `/seguimiento/r023` | Ficha individual de un pendiente en plazo |
-| `/seguimiento/r001` | Registro calificado con cero; no se trata como dato vacío |
+| Ruta                                | Resultado                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `/inicio`                           | Periodo, corte, filtros, indicadores y acceso al grupo                         |
+| `/grupos`                           | Grupos de la selección                                                         |
+| `/grupos/g01`                       | ENF-301, asignatura y docente                                                  |
+| `/asignaturas/i01`                  | Enfermería Clínica, clave visible ENF-304, actividad                           |
+| `/actividades/a01`                  | Plan de cuidados, resumen y registros                                          |
+| `/actividades/a01?estado=pendiente` | Exactamente 6 pendientes: 4 vencidos y 2 en plazo                              |
+| `/docentes`                         | Listado docente con búsqueda, filtros y entregas por responsable               |
+| `/docentes/d01`                     | Docente A: dos grupos y dos imparticiones, con desglose por actividad          |
+| `/seguimiento/r019`                 | Ficha individual de un pendiente vencido                                       |
+| `/seguimiento/r023`                 | Ficha individual de un pendiente en plazo                                      |
+| `/seguimiento/r001`                 | Registro calificado con cero; no se trata como dato vacío                      |
+| `/reportes`                         | Tres consultas por ciclo, conteos de personas/entregas, pesos y calendario     |
+| `/admin/insumos`                    | Sistemas: cargas ficticias con vista previa, validación y activación por ciclo |
 
 Desde Inicio: **Ver grupos y asignaturas → Abrir asignatura → Abrir actividad → 6 pendientes de calificar → Ver ficha**. La selección de una cifra limpia la búsqueda de estudiantes para que el detalle explique exactamente esa cifra. La búsqueda de estudiantes se conserva por actividad, sin afectar las consultas de otros docentes. La búsqueda, el orden y la página se recuperan al volver de la ficha.
 
@@ -71,9 +73,17 @@ Abrir **/docentes** sin parámetros consulta todo el ámbito ficticio. Al entrar
 
 Contrato de conteo, supuestos de Academia, pruebas y recorrido de revisión: [Seguimiento docente demo](docs/SEGUIMIENTO-DOCENTE-DEMO.md).
 
+### Reportes e insumos por ciclo
+
+El tablero se titula **Seguimiento a plataforma Moodle**. En **Reportes**, consultar estudiantes únicos con tarea calificada, entregas calificadas frente a pendientes y docentes con pendientes. Los filtros incluyen ciclo, carrera, modalidad, grupo, impartición, unidad, tipo y entregas extemporáneas. Ponderación por curso y avance de calificación se muestran por separado. El propedéutico conserva el estado **Calendario pendiente** y las reglas ausentes aparecen como **Sin criterio configurado**.
+
+Reportes amplía exclusivamente su conjunto ficticio a 38 personas / 54 pares: 31 calificadas, 17 pendientes y 6 sin entrega; no altera los seis pendientes originales. El ciclo 27-2 comienza sin insumos. Sistemas puede descargar cuatro plantillas JSON, seleccionar archivos, revisar filas, validar y activar cada tipo/ciclo por separado. La simulación se conserva en la pestaña; una carga inválida mantiene la versión anterior. Solo calendario permite consultar fechas sin inventar totales. No se procesan archivos reales de SPAI, bajas o Moodle ni se envían datos a servicios externos.
+
+Contrato JSON, muestras, reglas propuestas por validar con Academia, límites del perfil simulado y recorrido: [Reportes e insumos demo](docs/REPORTES-INSUMOS-DEMO.md). Las pruebas unitarias y E2E cubren conteos, filtros, ciclos, activación válida/inválida, recarga, perfiles, teclado y móvil, incluidos los instantes límite de entrega y corte. La suite utiliza el workflow existente: la validación local en Windows se distingue de los jobs ejecutados en Ubuntu al abrir el PR. Publicar la rama no despliega la demo.
+
 ## Perfiles y estados de prueba
 
-El selector superior cambia entre Coordinación, Dirección y Sistemas. Coordinación consulta y abre una vista previa de exportación sin descarga. Dirección recorre las mismas consultas sin exportación (D08 pendiente). Sistemas añade un menú administrativo separado; sus pantallas son Próximamente. Acceder directamente a `/admin/catalogos` desde otros perfiles muestra Acceso restringido. Estas restricciones de demostración no son seguridad de servidor ni autenticación real.
+El selector superior cambia entre Coordinación, Dirección y Sistemas. Coordinación consulta y abre una vista previa de exportación sin descarga. Dirección recorre las mismas consultas sin exportación (D08 pendiente). Sistemas añade un menú administrativo separado: **Insumos por ciclo** es funcional con archivos ficticios; las demás pantallas siguen como Próximamente. Acceder directamente a `/admin/insumos` o `/admin/catalogos` desde otros perfiles muestra Acceso restringido. Estas restricciones de demostración no son seguridad de servidor ni autenticación real.
 
 En Inicio, Grupos o Docentes, expandir **Filtros de consulta**:
 
@@ -86,10 +96,11 @@ En Inicio, Grupos o Docentes, expandir **Filtros de consulta**:
 ## Estructura y contrato
 
 - `src/app/core/models.ts`: entidades, contexto de consulta, estados e interfaz `AcademicDataSource` inyectada mediante `ACADEMIC_DATA`.
-- `src/app/core/demo-data.ts`: único origen de estudiantes y registros ficticios. No importa SDK de Firebase ni usa API de Moodle.
+- `src/app/core/demo-data.ts`: origen académico de estudiantes y registros ficticios de los recorridos originales. No importa SDK de Firebase ni usa API de Moodle.
+- `src/app/core/reporting/`: contrato y validación de archivos ficticios, versiones por ciclo, fixtures adicionales y selectores de Reportes.
 - `src/app/core/query-store.ts`: consulta reactiva, cancelación al cambiar de contexto, carga y errores.
 - `src/app/core/navigation-context.ts`: URL, contexto, perfil y búsqueda local.
-- `src/app/features/`: Inicio, grupos, asignaturas, actividades, seguimiento, docentes y estados; componentes standalone con rutas de carga diferida.
+- `src/app/features/`: Inicio, grupos, asignaturas, actividades, seguimiento, docentes, reportes, insumos y estados; componentes standalone con rutas de carga diferida.
 - `src/app/shared/`: filtros Material, indicadores, tabla/paginación/orden, diálogo de vista previa.
 - `src/styles.scss`: tema institucional común y adaptación responsiva; `src/tailwind.css`: Tailwind 4. Inter y recursos se sirven localmente.
 
@@ -103,4 +114,4 @@ Los ajustes de dependencias transitivas, sus pruebas de compatibilidad y la redu
 
 El refactor visual, las skills locales aplicadas y la instalación de `angular/skills` se documentan en [docs/REFACTOR-UI-SKILLS.md](docs/REFACTOR-UI-SKILLS.md). Incluye mejoras de accesibilidad, tablas móviles, iconografía local y evidencia de que los contratos y dependencias de la demo permanecen intactos.
 
-Próximamente: reportes completos y descarga, históricos, calidad de información y formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, conexión Moodle de solo lectura y publicación pertenecen a otras etapas. La demo no se ha desplegado.
+Próximamente: reportes institucionales definitivos y descarga, formatos reales de insumos, históricos, calidad de información y demás formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, conexión Moodle de solo lectura y publicación pertenecen a otras etapas. La demo no se ha desplegado.

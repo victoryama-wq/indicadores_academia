@@ -1,0 +1,194 @@
+<nav class="breadcrumbs" aria-label="Ruta de navegación">
+  <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a
+  ><span aria-hidden="true">/</span>Administración<span aria-hidden="true">/</span>Insumos por ciclo
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">ADMINISTRACIÓN · SISTEMAS</span>
+    <h1>Insumos por ciclo</h1>
+    <p>Selecciona, revisa y activa versiones ficticias por separado.</p>
+  </div>
+  <span class="pill green">Activación simulada</span>
+</div>
+<div class="notice info mb-5">
+  <strong>Solo archivos ficticios</strong>
+  <p>
+    JSON UTF-8, hasta 2 MiB y 5000 filas. La simulación se conserva al recargar esta pestaña; no se
+    envía a un servidor. Los perfiles son simulados, no autenticación real.
+  </p>
+</div>
+<section class="panel p-5 mb-5">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic"
+      ><mat-label>Ciclo de los insumos</mat-label
+      ><mat-select
+        [value]="nav.context().periodo"
+        (selectionChange)="
+          nav.update({
+            periodo: $event.value,
+            corte: 'c01',
+            carrera: 'todas',
+            modalidad: 'todas',
+            grupo: 'todos',
+            asignatura: 'todas',
+            docente: 'todos',
+            tipo: 'todos',
+            unidad: 'todas',
+          })
+        "
+      >
+        @for (c of cycles; track c.value) {
+          <mat-option [value]="c.value">{{ c.label }}</mat-option>
+        }
+      </mat-select></mat-form-field
+    ><a mat-button routerLink="/reportes" [queryParams]="nav.query({ extemporaneas: 'todas' })"
+      >Consultar reportes de este ciclo</a
+    >
+  </div>
+  <p class="mt-3">
+    Cada activación reemplaza solo un tipo de insumo de este ciclo. El calendario puede activarse y
+    consultarse sin los otros tres archivos.
+  </p>
+</section>
+@if (store.storageWarning()) {
+  <div class="notice warning mb-5" role="alert">{{ store.storageWarning() }}</div>
+}
+@if (store.status() === 'loading') {
+  <section class="panel empty" role="status">Cargando versiones de demostración…</section>
+} @else if (store.status() === 'error') {
+  <section class="panel empty" role="alert">
+    <h2>No se pudieron recuperar las versiones</h2>
+    <p>Recarga la página para reintentar.</p>
+  </section>
+} @else {
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+    @for (type of types; track type) {
+      <section
+        class="panel input-card"
+        [attr.data-testid]="'input-' + type"
+        [attr.aria-labelledby]="'title-' + type"
+      >
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">INSUMO INDEPENDIENTE</span>
+            <h2 [id]="'title-' + type">{{ labels[type] }}</h2>
+          </div>
+        </div>
+        <div class="p-5 pt-0">
+          @if (store.version(type, nav.context().periodo); as version) {
+            <div class="current-version">
+              <strong data-testid="current-version">Versión vigente: {{ version.version }}</strong>
+              <p>{{ version.filename }}</p>
+              <small
+                >{{ version.batch.filas.length }} filas ·
+                {{ version.activatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500' }} · Cancún</small
+              >
+            </div>
+          } @else {
+            <div class="current-version">
+              <strong>Sin versión vigente</strong>
+              <p>No se usarán insumos de otro ciclo.</p>
+            </div>
+          }
+          <button type="button" mat-button (click)="sample(type)">
+            Descargar ejemplo ficticio · {{ labels[type] }}
+          </button>
+          <label class="file-label" [for]="'file-' + type">Archivo de {{ labels[type] }}</label>
+          <input
+            class="file-input"
+            type="file"
+            accept=".json,application/json"
+            [id]="'file-' + type"
+            [attr.aria-describedby]="'help-' + type"
+            (change)="selectFile(type, $event)"
+          />
+          <small [id]="'help-' + type"
+            >Usa la plantilla del ciclo seleccionado. Una carga inválida no sustituye la versión
+            vigente.</small
+          >
+          @if (draft(type); as draft) {
+            @if (draft.reading) {
+              <p role="status">Leyendo archivo…</p>
+            }
+            @if (draft.filename) {
+              <p class="filename mt-3">Seleccionado: {{ draft.filename }}</p>
+            }
+            @if (draft.text) {
+              <details class="mt-3">
+                <summary>Vista previa del archivo seleccionado</summary>
+                <pre>{{ draft.text.slice(0, 2000) }}</pre>
+                <small
+                  >Vista previa de hasta 2000 caracteres. Se validan todas las filas del
+                  archivo.</small
+                >
+              </details>
+            }
+            <div class="actions mt-3">
+              <button
+                type="button"
+                mat-stroked-button
+                [disabled]="!draft.text || draft.reading"
+                (click)="validate(type)"
+              >
+                Validar archivo</button
+              ><button
+                type="button"
+                mat-flat-button
+                [disabled]="!draft.validation?.batch || draft.reading || draft.activated"
+                (click)="activate(type)"
+              >
+                Activar simulación
+              </button>
+            </div>
+            <p class="result mt-3" role="status">{{ draft.message }}</p>
+            @if (draft.validation; as result) {
+              <p>
+                {{ result.rowCount }} filas revisadas · {{ result.errors.length }} motivos de
+                rechazo
+              </p>
+              @if (result.errors.length) {
+                <table class="report-table" aria-label="Rechazos de validación">
+                  <thead>
+                    <tr>
+                      <th scope="col">Fila</th>
+                      <th scope="col">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (error of result.errors; track $index) {
+                      <tr>
+                        <td data-label="Fila">{{ error.fila === 0 ? 'Archivo' : error.fila }}</td>
+                        <td data-label="Motivo">{{ error.motivo }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @else {
+                <details open>
+                  <summary>Filas listas para activar</summary>
+                  <ul>
+                    @for (row of result.preview.slice(0, 10); track row.fila) {
+                      <li>Fila {{ row.fila }}: {{ row.resumen }}</li>
+                    }
+                  </ul>
+                  <small
+                    >Se muestran las primeras 10 filas. La activación incluye las
+                    {{ result.rowCount }} filas validadas.</small
+                  >
+                </details>
+              }
+            }
+          }
+        </div>
+      </section>
+    }
+  </div>
+}
+<section class="notice neutral mt-5">
+  <h2>Formatos pendientes de confirmar</h2>
+  <p>
+    Las exportaciones reales SPAI, bajas, calendario Moodle y libro de calificaciones requieren
+    muestras anonimizadas para validar columnas, identificadores, fechas, intentos, ponderaciones y
+    vigencias. Esta entrega no interpreta XLSX/CSV reales ni modifica Moodle.
+  </p>
+</section>
