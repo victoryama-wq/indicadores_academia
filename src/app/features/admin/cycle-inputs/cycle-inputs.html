@@ -6,15 +6,16 @@
   <div>
     <span class="eyebrow">ADMINISTRACIÓN · SISTEMAS</span>
     <h1>Insumos por ciclo</h1>
-    <p>Selecciona, revisa y activa versiones ficticias por separado.</p>
+    <p>Selecciona, revisa y activa versiones por ciclo en esta demo local.</p>
   </div>
   <span class="pill green">Activación simulada</span>
 </div>
 <div class="notice info mb-5">
-  <strong>Solo archivos ficticios</strong>
+  <strong>Piloto local · Calendario operativo 27-2</strong>
   <p>
-    JSON UTF-8, hasta 2 MiB y 5000 filas. La simulación se conserva al recargar esta pestaña; no se
-    envía a un servidor. Los perfiles son simulados, no autenticación real.
+    Calendario: XLSX con las dos hojas y cuatro bloques del formato 27-2. Otros insumos: JSON
+    ficticio. Hasta 2 MiB y 5000 actividades. La simulación se conserva al recargar esta pestaña; no
+    se envía a un servidor. Los perfiles son simulados, no autenticación real.
   </p>
 </div>
 <section class="panel p-5 mb-5">
@@ -80,8 +81,13 @@
               <strong data-testid="current-version">Versión vigente: {{ version.version }}</strong>
               <p>{{ version.filename }}</p>
               <small
-                >{{ version.batch.filas.length }} filas ·
-                {{ version.activatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500' }} · Cancún</small
+                >{{
+                  version.batch.tipo === 'calendario'
+                    ? (version.batch.programacion?.length ?? version.batch.filas.length)
+                    : version.batch.filas.length
+                }}
+                filas · {{ version.activatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500' }} ·
+                Cancún</small
               >
             </div>
           } @else {
@@ -97,7 +103,7 @@
           <input
             class="file-input"
             type="file"
-            accept=".json,application/json"
+            [accept]="type === 'calendario' ? '.json,.xlsx' : '.json,application/json'"
             [id]="'file-' + type"
             [attr.aria-describedby]="'help-' + type"
             (change)="selectFile(type, $event)"
@@ -127,7 +133,7 @@
               <button
                 type="button"
                 mat-stroked-button
-                [disabled]="!draft.text || draft.reading"
+                [disabled]="(!draft.text && !draft.imported) || draft.reading"
                 (click)="validate(type)"
               >
                 Validar archivo</button
@@ -150,6 +156,7 @@
                 <table class="report-table" aria-label="Rechazos de validación">
                   <thead>
                     <tr>
+                      <th scope="col">Pestaña</th>
                       <th scope="col">Fila</th>
                       <th scope="col">Motivo</th>
                     </tr>
@@ -157,6 +164,7 @@
                   <tbody>
                     @for (error of result.errors; track $index) {
                       <tr>
+                        <td data-label="Pestaña">{{ error.hoja ?? 'JSON' }}</td>
                         <td data-label="Fila">{{ error.fila === 0 ? 'Archivo' : error.fila }}</td>
                         <td data-label="Motivo">{{ error.motivo }}</td>
                       </tr>
@@ -164,11 +172,14 @@
                   </tbody>
                 </table>
               } @else {
+                @if (schedule(result); as schedule) {
+                  <app-calendar-schedule-view [rows]="schedule" />
+                }
                 <details open>
                   <summary>Filas listas para activar</summary>
                   <ul>
-                    @for (row of result.preview.slice(0, 10); track row.fila) {
-                      <li>Fila {{ row.fila }}: {{ row.resumen }}</li>
+                    @for (row of result.preview.slice(0, 10); track $index) {
+                      <li>{{ row.hoja ?? 'JSON' }} · Fila {{ row.fila }}: {{ row.resumen }}</li>
                     }
                   </ul>
                   <small
@@ -187,8 +198,11 @@
 <section class="notice neutral mt-5">
   <h2>Formatos pendientes de confirmar</h2>
   <p>
-    Las exportaciones reales SPAI, bajas, calendario Moodle y libro de calificaciones requieren
-    muestras anonimizadas para validar columnas, identificadores, fechas, intentos, ponderaciones y
-    vigencias. Esta entrega no interpreta XLSX/CSV reales ni modifica Moodle.
+    Las exportaciones reales SPAI, bajas y libro de calificaciones requieren muestras anonimizadas
+    para validar columnas, identificadores, fechas, intentos, ponderaciones y vigencias. El
+    calendario XLSX no identifica cursos ni personas: queda pendiente vincularlo. La apertura sin
+    hora se interpreta a las 00:00 de Cancún (supuesto piloto). En profesionalizantes, “Fecha de
+    entrega” se interpreta como corte/cierre. Los recordatorios se conservan como texto interno.
+    Propedéutico: Calendario pendiente. No se modifica Moodle ni el Google Sheet.
   </p>
 </section>

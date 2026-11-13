@@ -95,6 +95,12 @@ En Inicio, Grupos o Docentes, expandir **Filtros de consulta**:
 
 ## Estructura y contrato
 
+Piloto local **Calendario operativo 27-2**: Sistemas → Insumos por ciclo permite leer el XLSX
+de dos pestañas y cuatro bloques, revisar incidencias por pestaña/fila y activar la programación.
+Reportes conserva fechas por ciclo y los avisos de fuentes/vinculación pendientes; no inventa
+cursos a partir de un calendario general. Una carga inválida conserva la versión vigente.
+Ver [contrato, ejemplos y recorrido](docs/IMPORTACION-CALENDARIO-27-2.md).
+
 - `src/app/core/models.ts`: entidades, contexto de consulta, estados e interfaz `AcademicDataSource` inyectada mediante `ACADEMIC_DATA`.
 - `src/app/core/demo-data.ts`: origen académico de estudiantes y registros ficticios de los recorridos originales. No importa SDK de Firebase ni usa API de Moodle.
 - `src/app/core/reporting/`: contrato y validación de archivos ficticios, versiones por ciclo, fixtures adicionales y selectores de Reportes.

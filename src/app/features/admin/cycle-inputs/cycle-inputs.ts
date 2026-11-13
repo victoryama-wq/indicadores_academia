@@ -15,6 +15,7 @@ import {
 } from '../../../core/reporting/report-models';
 import { validateInput } from '../../../core/reporting/input-validation';
 import { sampleBatch } from '../../../core/reporting/report-fixtures';
+import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/calendar-schedule-view';
 
 interface Draft {
   text: string;
@@ -23,11 +24,19 @@ interface Draft {
   validation: Validation | null;
   message: string;
   activated: boolean;
+  imported?: Validation;
 }
 
 @Component({
   selector: 'app-cycle-inputs',
-  imports: [DatePipe, RouterLink, MatButtonModule, MatFormFieldModule, MatSelectModule],
+  imports: [
+    DatePipe,
+    RouterLink,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    CalendarScheduleView,
+  ],
   templateUrl: './cycle-inputs.html',
   styleUrl: './cycle-inputs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,10 +52,14 @@ export class CycleInputs {
   draft(type: InputType) {
     return this.drafts()[this.nav.context().periodo + ':' + type];
   }
+  schedule(validation: Validation) {
+    return validation.batch?.tipo === 'calendario' ? validation.batch.programacion : undefined;
+  }
   async selectFile(type: InputType, event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     const key = this.nav.context().periodo + ':' + type;
+    const cycle = this.nav.context().periodo;
     const token = (this.reads.get(key) ?? 0) + 1;
     this.reads.set(key, token);
     const draft: Draft = {
@@ -60,9 +73,27 @@ export class CycleInputs {
     this.drafts.update((v) => ({ ...v, [key]: draft }));
     if (!file) return;
     try {
-      if (!file.name.toLowerCase().endsWith('.json'))
-        throw new Error('Selecciona un archivo .json ficticio. XLSX y CSV quedan por confirmar.');
       if (file.size > 2 * 1024 * 1024) throw new Error('Límite de la demo: 2 MiB por archivo.');
+      if (type === 'calendario' && file.name.toLowerCase().endsWith('.xlsx')) {
+        const { readCalendarXlsx } = await import('../../../core/reporting/calendar-xlsx');
+        const imported = await readCalendarXlsx(file, cycle);
+        if (this.reads.get(key) === token)
+          this.drafts.update((v) => ({
+            ...v,
+            [key]: {
+              ...draft,
+              reading: false,
+              imported,
+              text: imported.batch ? JSON.stringify(imported.batch) : '',
+              message: 'XLSX leído. Valida para revisar las incidencias y la programación.',
+            },
+          }));
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith('.json'))
+        throw new Error(
+          'Usa .xlsx para el calendario operativo 27-2 o .json para las plantillas ficticias.',
+        );
       const text = await file.text();
       if (!text.trim()) throw new Error('El archivo está vacío. Se conserva la versión vigente.');
       if (this.reads.get(key) === token)
@@ -82,7 +113,7 @@ export class CycleInputs {
   validate(type: InputType) {
     const d = this.draft(type);
     if (!d || d.reading) return;
-    const validation = validateInput(d.text, type, this.nav.context().periodo);
+    const validation = d.imported ?? validateInput(d.text, type, this.nav.context().periodo);
     this.setDraft(type, {
       ...d,
       validation,
