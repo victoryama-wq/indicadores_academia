@@ -1,0 +1,15 @@
+@use '../report-layout';
+:host {
+  display: block;
+  min-width: 0;
+}
+summary {
+  cursor: pointer;
+  padding-block: 0.75rem;
+}
+td {
+  overflow-wrap: anywhere;
+}
+.table-scroll {
+  overflow-x: auto;
+}

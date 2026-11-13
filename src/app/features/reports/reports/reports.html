@@ -6,7 +6,7 @@
   <div>
     <span class="eyebrow">SEGUIMIENTO A PLATAFORMA MOODLE</span>
     <h1>Reportes</h1>
-    <p>Consultas con datos ficticios · Ciclo en operación: 27-1.</p>
+    <p>Consultas de demostración · Ciclo en operación: 27-1.</p>
   </div>
   <span class="pill green">Demostración local</span>
 </div>
@@ -68,7 +68,9 @@
       <p>
         Solo se cruzan versiones del ciclo seleccionado.
         @if (nav.profile() === 'sistemas') {
-          <a routerLink="/admin/insumos" [queryParams]="nav.query()">Revisar insumos por ciclo</a>
+          <a class="input-link" routerLink="/admin/insumos" [queryParams]="nav.query()"
+            >Revisar insumos por ciclo</a
+          >
         }
       </p>
     </section>
@@ -76,6 +78,22 @@
       <div class="notice warning mb-5">
         Sin movimientos de bajas cargados. La población es provisional.
       </div>
+    }
+    @if (report().needsLinking) {
+      <div class="notice info mb-5" role="status">
+        <strong>Calendario general · Vinculación pendiente · Totales no calculables</strong>
+        <p>
+          No contiene identificadores de cursos, grupos, docentes ni estudiantes. Se requieren las
+          correspondencias con SPAI y Moodle antes de calcular indicadores. No se inventan
+          imparticiones.
+        </p>
+        <p>
+          El calendario se filtra por modalidad, unidad y tipo. Los filtros de personas, carrera,
+          grupo, asignatura y extemporáneas requieren evidencia vinculada; no clasifican esta
+          programación.
+        </p>
+      </div>
+      <app-calendar-schedule-view [rows]="report().schedule" />
     }
     @if (report().missingSources.length) {
       <div class="notice warning mb-5" role="status">
@@ -85,7 +103,7 @@
           archivos.
         </p>
       </div>
-    } @else {
+    } @else if (!report().needsLinking) {
       <div
         class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5"
         aria-label="Resumen del contexto filtrado"
@@ -242,88 +260,91 @@
         </section>
       }
     }
-    <section class="panel p-5 mb-5">
-      <h2>Ponderación configurada por curso</h2>
-      <p>
-        Porcentajes de evaluación precargados o importados. No representan avance ni una
-        calificación final calculada.
-      </p>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        @for (c of courses(); track c.cursoId) {
-          <article class="course-card">
-            <h3>{{ c.asignatura }} · {{ c.grupo }}</h3>
-            <p>{{ weight(c) }}</p>
-            @if (c.propedeutico) {
-              <span class="pill">Calendario pendiente</span>
-            }
-          </article>
-        } @empty {
-          <p>No hay cursos en el calendario para esta selección.</p>
-        }
-      </div>
-    </section>
-    <section class="panel mb-5">
-      <div class="panel-heading">
-        <div>
-          <h2>Calendario y detalle por actividad</h2>
-          <p>
-            Ejecutiva, Virtual y Posgrados: apertura y corte como cierre. Escolarizada: entrega y
-            corte distintos. “Recordarme calificar” es un recordatorio interno, no modifica el
-            plazo.
-          </p>
+    @if (!report().needsLinking) {
+      <section class="panel p-5 mb-5">
+        <h2>Ponderación configurada por curso</h2>
+        <p>
+          Porcentajes de evaluación precargados o importados. No representan avance ni una
+          calificación final calculada.
+        </p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          @for (c of courses(); track c.cursoId) {
+            <article class="course-card">
+              <h3>{{ c.asignatura }} · {{ c.grupo }}</h3>
+              <p>{{ weight(c) }}</p>
+              @if (c.propedeutico) {
+                <span class="pill">Calendario pendiente</span>
+              }
+            </article>
+          } @empty {
+            <p>No hay cursos en el calendario para esta selección.</p>
+          }
         </div>
-      </div>
-      <div class="activity-grid p-5">
-        @for (a of report().activities; track a.cursoId + ':' + a.actividadId) {
-          <article class="course-card">
-            <span class="eyebrow">{{ a.grupo }} · {{ a.modalidad }}</span>
-            <h3>{{ a.actividad }}</h3>
+      </section>
+      <section class="panel mb-5">
+        <div class="panel-heading">
+          <div>
+            <h2>Calendario y detalle por actividad</h2>
             <p>
-              {{ a.asignatura }} · {{ labels[a.tipo] }} ·
-              {{ a.unidad === 'u01' ? 'Unidad 1' : 'Unidad 2' }}
+              Ejecutiva, Virtual y Posgrados: apertura y corte como cierre. Escolarizada: entrega y
+              corte distintos. “Recordarme calificar” es un recordatorio interno, no modifica el
+              plazo.
             </p>
-            <span class="pill">{{ closingRule(a) }}</span>
-            <dl>
-              <dt>Apertura</dt>
-              <dd>
-                {{
-                  a.apertura
-                    ? (a.apertura | date: 'dd/MM/yyyy HH:mm' : '-0500')
-                    : 'Sin criterio configurado'
-                }}
-              </dd>
-              <dt>Fecha de entrega</dt>
-              <dd>
-                {{
-                  a.entrega ? (a.entrega | date: 'dd/MM/yyyy HH:mm' : '-0500') : 'No configurada'
-                }}
-              </dd>
-              <dt>Fecha de corte / cierre</dt>
-              <dd>
-                {{
-                  a.corte
-                    ? (a.corte | date: 'dd/MM/yyyy HH:mm' : '-0500')
-                    : 'Sin criterio configurado'
-                }}
-              </dd>
-              <dt>Recordarme calificar · interno</dt>
-              <dd>
-                {{
-                  a.recordarmeCalificar
-                    ? (a.recordarmeCalificar | date: 'dd/MM/yyyy HH:mm' : '-0500')
-                    : 'No configurado'
-                }}
-              </dd>
-            </dl>
-            @if (!report().missingSources.length) {
+          </div>
+        </div>
+        <div class="activity-grid p-5">
+          @for (a of report().activities; track a.cursoId + ':' + a.actividadId) {
+            <article class="course-card">
+              <span class="eyebrow">{{ a.grupo }} · {{ a.modalidad }}</span>
+              <h3>{{ a.actividad }}</h3>
               <p>
-                {{ a.graded }} calificadas · {{ a.pending }} pendientes · {{ a.late }} extemporáneas
+                {{ a.asignatura }} · {{ labels[a.tipo] }} ·
+                {{ a.unidad === 'u01' ? 'Unidad 1' : 'Unidad 2' }}
               </p>
-            }
-          </article>
-        }
-      </div>
-    </section>
+              <span class="pill">{{ closingRule(a) }}</span>
+              <dl>
+                <dt>Apertura</dt>
+                <dd>
+                  {{
+                    a.apertura
+                      ? (a.apertura | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                      : 'Sin criterio configurado'
+                  }}
+                </dd>
+                <dt>Fecha de entrega</dt>
+                <dd>
+                  {{
+                    a.entrega ? (a.entrega | date: 'dd/MM/yyyy HH:mm' : '-0500') : 'No configurada'
+                  }}
+                </dd>
+                <dt>Fecha de corte / cierre</dt>
+                <dd>
+                  {{
+                    a.corte
+                      ? (a.corte | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                      : 'Sin criterio configurado'
+                  }}
+                </dd>
+                <dt>Recordarme calificar · interno</dt>
+                <dd>
+                  {{
+                    a.recordarmeCalificar
+                      ? (a.recordarmeCalificar | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                      : 'No configurado'
+                  }}
+                </dd>
+              </dl>
+              @if (!report().missingSources.length) {
+                <p>
+                  {{ a.graded }} calificadas · {{ a.pending }} pendientes ·
+                  {{ a.late }} extemporáneas
+                </p>
+              }
+            </article>
+          }
+        </div>
+      </section>
+    }
     @if (report().issues.length) {
       <section class="notice warning mb-5">
         <h2>Correspondencias pendientes</h2>

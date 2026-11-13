@@ -166,6 +166,9 @@ export class ContextFilters {
         { value: 'todas', label: 'Todas las unidades' },
         { value: 'u01', label: 'Unidad 1' },
         { value: 'u02', label: this.reportMode() ? 'Unidad 2' : 'Unidad 2 · Sin datos demo' },
+        ...(this.reportMode()
+          ? [3, 4, 5, 6, 7].map((n) => ({ value: 'u0' + n, label: 'Unidad ' + n }))
+          : []),
       ],
     },
   ]);
