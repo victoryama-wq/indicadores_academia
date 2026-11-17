@@ -1,4 +1,5 @@
 import { Snapshot } from '../models';
+import { populationSample } from './population-fixtures';
 import {
   CalendarRow,
   EnrollmentRow,
@@ -39,6 +40,8 @@ export function demoCalendar(cycle: string, course = 'demo-curso'): CalendarRow 
 export function sampleBatch(type: InputType, cycle: string): InputBatch {
   const month = cycle === 'p02' ? '2027-03' : '2026-11';
   switch (type) {
+    case 'saeko':
+      return populationSample('saeko', cycle);
     case 'calendario':
       return { schemaVersion: 1, tipo: type, ciclo: cycle, filas: [demoCalendar(cycle)] };
     case 'spai':

@@ -6,6 +6,7 @@ import { NavigationContext } from '../navigation-context';
 import { CYCLES, INPUT_TYPES, InputBatch, InputType, InputVersion } from './report-models';
 import { seedBatches } from './report-fixtures';
 import { validateInput } from './input-validation';
+import { crossPopulation } from './population';
 interface Seed {
   status: 'loading' | 'ready' | 'error';
   batches: InputBatch[];
@@ -26,6 +27,16 @@ export class CycleInputStore {
     { initialValue: { status: 'loading' as const, batches: [] } },
   );
   readonly status = computed(() => this.seed().status);
+  population(cycle: string, draft?: InputBatch | null) {
+    return crossPopulation(
+      cycle,
+      (['saeko', 'spai'] as const).flatMap((t) => {
+        const b =
+          draft?.tipo === t && draft.ciclo === cycle ? draft : this.version(t, cycle)?.batch;
+        return b ? [b] : [];
+      }),
+    );
+  }
   readonly storageWarning = signal('');
   private readonly storageKey = 'academia-inputs-demo-v1';
   private readonly overrides = signal<Readonly<Record<string, InputVersion>>>(this.restore());

@@ -1,14 +1,16 @@
 import { CalendarScheduleRow } from './calendar-schedule';
+import type { RosterRow, TeachingRow } from './population';
 
 export const CYCLES = [
   { value: 'p01', label: '27-1 · En operación (demo)' },
   { value: 'p02', label: '27-2 · Preparación (demo)' },
 ] as const;
-export const INPUT_TYPES = ['calendario', 'spai', 'bajas', 'calificaciones'] as const;
+export const INPUT_TYPES = ['calendario', 'saeko', 'spai', 'bajas', 'calificaciones'] as const;
 export type InputType = (typeof INPUT_TYPES)[number];
 export const INPUT_LABELS: Record<InputType, string> = {
   calendario: 'Calendario Moodle',
   spai: 'Exportación SPAI',
+  saeko: 'Padrón activo de Saeko',
   bajas: 'Movimientos de bajas',
   calificaciones: 'Libro de calificaciones',
 };
@@ -69,6 +71,7 @@ export interface GradeRow {
   calificadaEn: string | null;
 }
 export interface InputRows {
+  saeko: RosterRow;
   calendario: CalendarRow;
   spai: EnrollmentRow;
   bajas: WithdrawalRow;
@@ -80,7 +83,13 @@ export type InputBatch = {
     tipo: K;
     ciclo: string;
     filas: InputRows[K][];
-  } & (K extends 'calendario' ? { programacion?: CalendarScheduleRow[] } : object);
+  } & (K extends 'calendario'
+    ? { programacion?: CalendarScheduleRow[] }
+    : K extends 'saeko'
+      ? { fechaCorte?: string | null }
+      : K extends 'spai'
+        ? { imparticiones?: TeachingRow[] }
+        : object);
 }[InputType];
 export interface Rejection {
   hoja?: string;
