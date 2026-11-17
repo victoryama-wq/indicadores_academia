@@ -17,6 +17,41 @@
     <h2>No se pudieron leer los insumos</h2>
     <p>Recarga la página para reintentar. No se muestran totales sin evidencia.</p>
   </section>
+} @else if (population()) {
+  @if (!report().needsLinking) {
+    <mat-form-field appearance="outline"
+      ><mat-label>Ciclo del cruce</mat-label
+      ><mat-select
+        [value]="nav.context().periodo"
+        (selectionChange)="nav.update({ periodo: $event.value })"
+      >
+        @for (c of cycles; track c.value) {
+          <mat-option [value]="c.value">{{ c.label }}</mat-option>
+        }
+      </mat-select></mat-form-field
+    >
+  }
+  <app-population-view [value]="population()!" heading="Cobertura del ciclo seleccionado" />
+  <section class="panel p-5 mb-5">
+    <h2>Entregas y calificaciones</h2>
+    <p>
+      No calculables: falta verificar el ID interno de Moodle por título y ciclo y vincular las
+      actividades, entregas y calificaciones de esas imparticiones. El número de SPAI solo ayuda a
+      localizar el curso. Una asignación por confirmar no genera entregas esperadas ni pendientes
+      docentes.
+    </p>
+  </section>
+  @if (report().needsLinking) {
+    <p>
+      Los filtros siguientes se aplican al calendario; la cobertura corresponde al ciclo completo.
+    </p>
+    <app-context-filters [reportMode]="true" [catalog]="report().catalog" />
+    @if (report().schedule.length) {
+      <app-calendar-schedule-view [rows]="report().schedule" />
+    } @else {
+      <p>No hay actividades del calendario para los filtros seleccionados.</p>
+    }
+  }
 } @else {
   <app-context-filters [reportMode]="true" [catalog]="report().catalog" />
   <section class="panel p-5 mb-5" aria-label="Consulta y entregas extemporáneas">

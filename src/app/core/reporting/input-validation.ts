@@ -7,9 +7,11 @@ import {
   Validation,
 } from './report-models';
 import { CALENDAR_BLOCKS } from './calendar-schedule';
+import { validatePopulation } from './population-import';
 
 const common = ['ciclo', 'cursoId'];
 const fields: Record<InputType, readonly string[]> = {
+  saeko: [],
   calendario: [
     ...common,
     'asignatura',
@@ -114,6 +116,8 @@ export function validateInput(text: string, type: InputType, cycle: string): Val
     return result;
   }
   const rows: unknown[] = raw['filas'];
+  if (type === 'saeko' || (type === 'spai' && Object.hasOwn(raw, 'imparticiones')))
+    return validatePopulation(raw, type, cycle, result);
   if (Object.hasOwn(raw, 'programacion')) {
     if (type !== 'calendario' || cycle !== 'p02' || rows.length) {
       reject(0, 'La programación XLSX requiere calendario 27-2 sin filas de cursos vinculados.');

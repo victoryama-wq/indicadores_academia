@@ -11,11 +11,12 @@
   <span class="pill green">Activación simulada</span>
 </div>
 <div class="notice info mb-5">
-  <strong>Piloto local · Calendario operativo 27-2</strong>
+  <strong>Pilotos locales · Padrón y asignaciones 27-1 · Calendario operativo 27-2</strong>
   <p>
-    Calendario: XLSX con las dos hojas y cuatro bloques del formato 27-2. Otros insumos: JSON
-    ficticio. Hasta 2 MiB y 5000 actividades. La simulación se conserva al recargar esta pestaña; no
-    se envía a un servidor. Los perfiles son simulados, no autenticación real.
+    Calendario: XLSX con las dos hojas y cuatro bloques del formato 27-2. Saeko y asignaciones SPAI:
+    XLSX o JSON. Otros insumos: JSON ficticio. Hasta 2 MiB y 5000 filas. La simulación se conserva
+    al recargar esta pestaña; no se envía a un servidor. Los perfiles son simulados, no
+    autenticación real.
   </p>
 </div>
 <section class="panel p-5 mb-5">
@@ -48,7 +49,7 @@
   </div>
   <p class="mt-3">
     Cada activación reemplaza solo un tipo de insumo de este ciclo. El calendario puede activarse y
-    consultarse sin los otros tres archivos.
+    consultarse sin los demás archivos.
   </p>
 </section>
 @if (store.storageWarning()) {
@@ -62,6 +63,9 @@
     <p>Recarga la página para reintentar.</p>
   </section>
 } @else {
+  @if (current(); as population) {
+    <app-population-view [value]="population" [details]="true" heading="Cruce vigente del ciclo" />
+  }
   <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
     @for (type of types; track type) {
       <section
@@ -84,7 +88,9 @@
                 >{{
                   version.batch.tipo === 'calendario'
                     ? (version.batch.programacion?.length ?? version.batch.filas.length)
-                    : version.batch.filas.length
+                    : ((version.batch.tipo === 'spai'
+                        ? version.batch.imparticiones?.length
+                        : undefined) ?? version.batch.filas.length)
                 }}
                 filas · {{ version.activatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500' }} ·
                 Cancún</small
@@ -99,11 +105,20 @@
           <button type="button" mat-button (click)="sample(type)">
             Descargar ejemplo ficticio · {{ labels[type] }}
           </button>
+          @if (type === 'spai') {
+            <button type="button" mat-button (click)="sample(type, true)">
+              Descargar asignaciones SPAI ficticias para cruzar con Saeko
+            </button>
+          }
           <label class="file-label" [for]="'file-' + type">Archivo de {{ labels[type] }}</label>
           <input
             class="file-input"
             type="file"
-            [accept]="type === 'calendario' ? '.json,.xlsx' : '.json,application/json'"
+            [accept]="
+              type === 'calendario' || type === 'saeko' || type === 'spai'
+                ? '.json,.xlsx'
+                : '.json,application/json'
+            "
             [id]="'file-' + type"
             [attr.aria-describedby]="'help-' + type"
             (change)="selectFile(type, $event)"
@@ -113,6 +128,12 @@
             vigente.</small
           >
           @if (draft(type); as draft) {
+            @if (type === 'saeko' && draft.imported?.batch && !draft.activated) {
+              <label
+                >Fecha de corte del padrón (opcional)
+                <input type="date" #cutoff (change)="setCutoff(cutoff.value)"
+              /></label>
+            }
             @if (draft.reading) {
               <p role="status">Leyendo archivo…</p>
             }
@@ -174,6 +195,13 @@
               } @else {
                 @if (schedule(result); as schedule) {
                   <app-calendar-schedule-view [rows]="schedule" />
+                }
+                @if (previews()[type]; as preview) {
+                  <app-population-view
+                    [value]="preview"
+                    heading="Vista previa del cruce"
+                    [details]="true"
+                  />
                 }
                 <details open>
                   <summary>Filas listas para activar</summary>

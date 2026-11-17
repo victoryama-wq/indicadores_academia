@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +15,8 @@ import {
 } from '../../../core/reporting/report-models';
 import { validateInput } from '../../../core/reporting/input-validation';
 import { sampleBatch } from '../../../core/reporting/report-fixtures';
+import { populationSample } from '../../../core/reporting/population-fixtures';
+import { PopulationView } from '../../../shared/population-view';
 import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/calendar-schedule-view';
 
 interface Draft {
@@ -36,6 +38,7 @@ interface Draft {
     MatFormFieldModule,
     MatSelectModule,
     CalendarScheduleView,
+    PopulationView,
   ],
   templateUrl: './cycle-inputs.html',
   styleUrl: './cycle-inputs.scss',
@@ -49,6 +52,21 @@ export class CycleInputs {
   readonly labels = INPUT_LABELS;
   private readonly drafts = signal<Readonly<Record<string, Draft>>>({});
   private readonly reads = new Map<string, number>();
+  readonly current = computed(() => this.store.population(this.nav.context().periodo));
+  readonly previews = computed(() =>
+    Object.fromEntries(
+      (['saeko', 'spai'] as const).map((t) => {
+        const d = this.draft(t),
+          b = d?.validation?.batch;
+        return [
+          t,
+          b && !d?.activated && (b.tipo === 'saeko' || (b.tipo === 'spai' && b.imparticiones))
+            ? this.store.population(this.nav.context().periodo, b)
+            : null,
+        ];
+      }),
+    ),
+  );
   draft(type: InputType) {
     return this.drafts()[this.nav.context().periodo + ':' + type];
   }
@@ -74,9 +92,24 @@ export class CycleInputs {
     if (!file) return;
     try {
       if (file.size > 2 * 1024 * 1024) throw new Error('Límite de la demo: 2 MiB por archivo.');
-      if (type === 'calendario' && file.name.toLowerCase().endsWith('.xlsx')) {
-        const { readCalendarXlsx } = await import('../../../core/reporting/calendar-xlsx');
-        const imported = await readCalendarXlsx(file, cycle);
+      if (
+        file.name.toLowerCase().endsWith('.xlsx') &&
+        (type === 'calendario' || type === 'saeko' || type === 'spai')
+      ) {
+        let imported: Validation;
+        if (type === 'calendario') {
+          const { readCalendarXlsx } = await import('../../../core/reporting/calendar-xlsx');
+          imported = await readCalendarXlsx(file, cycle);
+        } else {
+          const { default: read } = await import('read-excel-file/universal');
+          const { parsePopulationSheets } =
+            await import('../../../core/reporting/population-import');
+          imported = parsePopulationSheets(
+            await read(await file.arrayBuffer(), { trim: false }),
+            type,
+            cycle,
+          );
+        }
         if (this.reads.get(key) === token)
           this.drafts.update((v) => ({
             ...v,
@@ -85,15 +118,13 @@ export class CycleInputs {
               reading: false,
               imported,
               text: imported.batch ? JSON.stringify(imported.batch) : '',
-              message: 'XLSX leído. Valida para revisar las incidencias y la programación.',
+              message: 'XLSX leído. Valida para revisar las filas e incidencias.',
             },
           }));
         return;
       }
       if (!file.name.toLowerCase().endsWith('.json'))
-        throw new Error(
-          'Usa .xlsx para el calendario operativo 27-2 o .json para las plantillas ficticias.',
-        );
+        throw new Error('Usa XLSX de calendario, Saeko o SPAI, o una plantilla JSON del insumo.');
       const text = await file.text();
       if (!text.trim()) throw new Error('El archivo está vacío. Se conserva la versión vigente.');
       if (this.reads.get(key) === token)
@@ -133,14 +164,37 @@ export class CycleInputs {
       message: error ?? 'Activación simulada completada. Nueva versión vigente en esta pestaña.',
     });
   }
-  sample(type: InputType) {
+  setCutoff(value: string) {
+    const d = this.draft('saeko'),
+      b = d?.imported?.batch;
+    if (!d || b?.tipo !== 'saeko') return;
+    const text = JSON.stringify({ ...b, fechaCorte: value || null });
+    this.setDraft('saeko', {
+      ...d,
+      text,
+      imported: validateInput(text, 'saeko', b.ciclo),
+      validation: null,
+      activated: false,
+      message: 'Valida el padrón con su fecha de corte.',
+    });
+  }
+  sample(type: InputType, assignment = false) {
     const cycle = this.nav.context().periodo;
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(sampleBatch(type, cycle), null, 2)], { type: 'application/json' }),
+      new Blob(
+        [
+          JSON.stringify(
+            assignment ? populationSample('spai', cycle) : sampleBatch(type, cycle),
+            null,
+            2,
+          ),
+        ],
+        { type: 'application/json' },
+      ),
     );
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${type}-${cycle}-ficticio.json`;
+    a.download = `${assignment ? 'asignaciones-spai' : type}-${cycle}-ficticio.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

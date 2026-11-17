@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { PopulationView } from '../../../shared/population-view';
+import { CYCLES } from '../../../core/reporting/report-models';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,6 +22,7 @@ import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/cal
 @Component({
   selector: 'app-reports',
   imports: [
+    PopulationView,
     DatePipe,
     RouterLink,
     MatButtonModule,
@@ -35,6 +38,8 @@ import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/cal
 export class Reports {
   readonly nav = inject(NavigationContext);
   readonly inputs = inject(CycleInputStore);
+  readonly cycles = CYCLES;
+  readonly population = computed(() => this.inputs.population(this.nav.context().periodo));
   readonly labels = TYPE_LABELS;
   readonly inputLabels = INPUT_LABELS;
   readonly lateOptions = Object.entries(LATE_LABELS).map(([value, label]) => ({ value, label }));
