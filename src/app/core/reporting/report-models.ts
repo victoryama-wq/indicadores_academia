@@ -1,3 +1,5 @@
+import { CalendarScheduleRow } from './calendar-schedule';
+
 export const CYCLES = [
   { value: 'p01', label: '27-1 · En operación (demo)' },
   { value: 'p02', label: '27-2 · Preparación (demo)' },
@@ -73,9 +75,15 @@ export interface InputRows {
   calificaciones: GradeRow;
 }
 export type InputBatch = {
-  [K in InputType]: { schemaVersion: 1; tipo: K; ciclo: string; filas: InputRows[K][] };
+  [K in InputType]: {
+    schemaVersion: 1;
+    tipo: K;
+    ciclo: string;
+    filas: InputRows[K][];
+  } & (K extends 'calendario' ? { programacion?: CalendarScheduleRow[] } : object);
 }[InputType];
 export interface Rejection {
+  hoja?: string;
   fila: number;
   motivo: string;
 }
@@ -83,7 +91,7 @@ export interface Validation {
   batch: InputBatch | null;
   errors: Rejection[];
   rowCount: number;
-  preview: { fila: number; resumen: string }[];
+  preview: { fila: number; resumen: string; hoja?: string }[];
 }
 export interface InputVersion {
   batch: InputBatch;

@@ -2,7 +2,7 @@
 
 ## Alcance y navegación
 
-Rama `feat/reportes-demo`, base `cad9c1f872bf9a61c38f5c19b27b66c2b5c50913` de `main`. El alcance comprende la demo, su revisión y la publicación de un PR abierto; no incluye merge, despliegue ni cambios de reglas de GitHub. El PR #4 de recuperación de CI sigue siendo independiente.
+La etapa `feat/reportes-demo` se integró con el PR #5 en `7054f19e2a94a557a9176c5d12b21fd4e167816a`; el PR #4 fue cerrado como sustituido. La ampliación local del lector XLSX se documenta en [IMPORTACION-CALENDARIO-27-2.md](IMPORTACION-CALENDARIO-27-2.md). Los resultados históricos de esta página corresponden a la etapa de Reportes.
 
 - `/inicio`: título **Seguimiento a plataforma Moodle**; conserva el recorrido original.
 - `/reportes`: tres consultas, filtros por ciclo, carrera, modalidad, grupo, docente, impartición, unidad, tipo y entrega extemporánea. La consulta y los filtros se conservan en la URL, también al recargar.
@@ -54,7 +54,7 @@ Se contrastó el documento externo `Requerimientos_Indicadores_Academia_v0_5.doc
 
 ## Esquema de los archivos ficticios
 
-Descargar cada ejemplo desde su tarjeta en `/admin/insumos`, después de seleccionar el ciclo. También hay cuatro ejemplos `p02` en `docs/ejemplos-insumos/`. Se aceptan **JSON UTF-8 `.json`**, máximo **2 MiB / 5000 filas**. No se interpretan archivos reales XLSX/CSV.
+Descargar cada ejemplo desde su tarjeta en `/admin/insumos`, después de seleccionar el ciclo. También hay cuatro ejemplos JSON `p02` en `docs/ejemplos-insumos/`. Se aceptan **JSON UTF-8 `.json`**, máximo **2 MiB / 5000 filas**. El calendario 27-2 admite además el formato XLSX específico del [piloto de importación](IMPORTACION-CALENDARIO-27-2.md); los demás formatos reales XLSX/CSV siguen pendientes.
 
 Todos usan un objeto con estas cuatro propiedades:
 

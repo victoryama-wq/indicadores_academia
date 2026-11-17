@@ -6,6 +6,7 @@ import {
   MODALITIES,
   Validation,
 } from './report-models';
+import { CALENDAR_BLOCKS } from './calendar-schedule';
 
 const common = ['ciclo', 'cursoId'];
 const fields: Record<InputType, readonly string[]> = {
@@ -113,6 +114,123 @@ export function validateInput(text: string, type: InputType, cycle: string): Val
     return result;
   }
   const rows: unknown[] = raw['filas'];
+  if (Object.hasOwn(raw, 'programacion')) {
+    if (type !== 'calendario' || cycle !== 'p02' || rows.length) {
+      reject(0, 'La programación XLSX requiere calendario 27-2 sin filas de cursos vinculados.');
+      return result;
+    }
+    const schedule: unknown = raw['programacion'];
+    if (!Array.isArray(schedule) || !schedule.length || schedule.length > 5000) {
+      reject(0, 'Programación inválida: se requieren entre 1 y 5000 actividades.');
+      return result;
+    }
+    const seen = new Set<string>();
+    const blocks = new Set<string>();
+    result.rowCount = schedule.length;
+    for (const [index, entry] of schedule.entries()) {
+      if (!object(entry)) {
+        reject(index + 1, 'Actividad de programación inválida.');
+        continue;
+      }
+      const r = entry;
+      const fila =
+        typeof r['fila'] === 'number' && Number.isInteger(r['fila']) && r['fila'] > 0
+          ? r['fila']
+          : index + 1;
+      const hoja = typeof r['hoja'] === 'string' ? r['hoja'] : 'Archivo';
+      const error = (motivo: string) => result.errors.push({ hoja, fila, motivo });
+      const fields = [
+        'hoja',
+        'fila',
+        'bloque',
+        'unidad',
+        'actividad',
+        'tipo',
+        'parcial',
+        'ponderacion',
+        'apertura',
+        'entrega',
+        'corte',
+        'recordatorio',
+      ];
+      if (
+        fields.some((k) => !Object.hasOwn(r, k)) ||
+        Object.keys(r).some((k) => !fields.includes(k))
+      )
+        error('Campos de programación ausentes o desconocidos.');
+      for (const key of ['hoja', 'bloque', 'unidad', 'actividad', 'tipo'])
+        if (typeof r[key] !== 'string' || !r[key].trim() || r[key].length > 180)
+          error(`${key}: texto inválido.`);
+      if (r['fila'] !== fila) error('Fila de origen inválida.');
+      if (!Object.hasOwn(CALENDAR_BLOCKS, String(r['bloque'])))
+        error('Bloque de calendario desconocido.');
+      blocks.add(String(r['bloque']));
+      if (!/^u0[1-7]$/.test(String(r['unidad']))) error('Unidad no reconocida (1 a 7).');
+      if (!['integradora', 'foro', 'examen'].includes(String(r['tipo'])))
+        error('Tipo de actividad no reconocido.');
+      if (
+        typeof r['ponderacion'] !== 'number' ||
+        !Number.isFinite(r['ponderacion']) ||
+        r['ponderacion'] < 0 ||
+        r['ponderacion'] > 100
+      )
+        error('Ponderación inválida.');
+      for (const key of ['parcial', 'recordatorio'])
+        if (r[key] !== null && (typeof r[key] !== 'string' || r[key].length > 180))
+          error(`${key}: texto inválido.`);
+      if (
+        r['bloque'] === 'escolarizada' &&
+        !/^PARCIAL [1-3]\s*\|\s*\d+(\.\d+)?%$/.test(String(r['parcial']))
+      )
+        error('Parcial inválido.');
+      for (const key of ['apertura', 'entrega', 'corte']) {
+        if (key === 'entrega' && r['bloque'] !== 'escolarizada') {
+          if (r[key] !== null)
+            error(
+              'En Ejecutiva, Virtual y Posgrados se usa corte como cierre, sin entrega separada.',
+            );
+          continue;
+        }
+        if (!validDate(r[key])) error(`${key}: fecha inválida.`);
+        else if (
+          Date.parse(r[key]) < Date.parse('2027-01-01T00:00:00-05:00') ||
+          Date.parse(r[key]) >= Date.parse('2027-05-01T00:00:00-05:00')
+        )
+          error(`${key}: fuera del intervalo piloto 27-2.`);
+      }
+      for (const [a, b] of [
+        ['apertura', 'corte'],
+        ['apertura', 'entrega'],
+        ['entrega', 'corte'],
+      ])
+        if (validDate(r[a]) && validDate(r[b]) && Date.parse(r[a]) > Date.parse(r[b]))
+          error(`${a} debe ser anterior o igual a ${b}.`);
+      const key = JSON.stringify([r['bloque'], r['unidad'], r['tipo']]);
+      if (seen.has(key)) error('Actividad duplicada dentro del bloque y unidad.');
+      seen.add(key);
+      result.preview.push({
+        hoja,
+        fila,
+        resumen: `${CALENDAR_BLOCKS[r['bloque'] as keyof typeof CALENDAR_BLOCKS]} · ${r['unidad']} · ${r['actividad']} · Apertura ${r['apertura']} · Entrega ${r['entrega'] ?? 'No aplica'} · Corte ${r['corte']}`,
+      });
+    }
+    for (const b of Object.keys(CALENDAR_BLOCKS))
+      if (!blocks.has(b))
+        reject(
+          0,
+          `Programación sin actividades en ${CALENDAR_BLOCKS[b as keyof typeof CALENDAR_BLOCKS]}.`,
+        );
+    for (const b of blocks)
+      for (let unit = 1; unit <= 7; unit++)
+        for (const type of ['integradora', 'foro', 'examen'])
+          if (!seen.has(JSON.stringify([b, 'u0' + unit, type])))
+            reject(
+              0,
+              `Falta ${type}, unidad ${unit}, bloque ${CALENDAR_BLOCKS[b as keyof typeof CALENDAR_BLOCKS]}.`,
+            );
+    if (!result.errors.length) result.batch = raw as unknown as InputBatch;
+    return result;
+  }
   result.rowCount = rows.length;
   if (rows.length > 5000) {
     reject(0, 'Límite de demostración: 5000 filas.');

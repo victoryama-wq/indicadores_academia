@@ -168,7 +168,7 @@ test('activación parcial, reemplazo válido e inválido, bajas y aislamiento en
   if (invalid.tipo !== 'calificaciones') throw new Error('Plantilla incorrecta');
   invalid.filas.push(invalid.filas[0]);
   const book = await upload(page, 'calificaciones', invalid, false);
-  await expect(book.getByRole('row').last().getByRole('cell').first()).toHaveText('2');
+  await expect(book.getByRole('row').last().locator('[data-label="Fila"]')).toHaveText('2');
   await expect(book.getByTestId('current-version')).toHaveText('Versión vigente: 1');
   await expect(
     book.getByRole('button', { name: 'Activar simulación', exact: true }),
@@ -345,7 +345,7 @@ test('plantillas descargables, ejemplos documentados y rechazos de archivo vací
   await upload(page, 'calendario', invalid, false);
   await expect(card.getByRole('table')).toContainText('apertura: fecha ISO inválida');
   await expect(
-    card.getByRole('table').getByRole('row').last().getByRole('cell').first(),
+    card.getByRole('table').getByRole('row').last().locator('[data-label="Fila"]'),
   ).toHaveText('1');
   await expect(card).toContainText('Sin versión vigente');
 });

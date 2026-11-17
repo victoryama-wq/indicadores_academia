@@ -1,0 +1,80 @@
+<section class="panel p-5 mb-5" aria-label="Programación del calendario importado">
+  <h2>Programación del calendario importado</h2>
+  <p>
+    {{ rows().length }} actividades de calendario en la selección. No son entregas ni estudiantes.
+  </p>
+  <p>Fechas en Cancún (UTC−05:00). Apertura sin hora: 00:00, supuesto del piloto.</p>
+  <p>
+    Ponderaciones originales por actividad y parcial/bloque; no equivalen a ponderaciones de un
+    curso Moodle vinculado ni a porcentaje de avance. Pendientes de confirmación.
+  </p>
+  <span class="pill">Propedéutico · Calendario pendiente</span>
+  @for (block of blocks(); track block.id) {
+    <details class="mt-5">
+      <summary>
+        <strong>{{ block.label }}</strong> · {{ block.rows.length }} actividades
+      </summary>
+      <p class="mt-3">
+        {{
+          block.id === 'escolarizada'
+            ? 'Escolarizada: entrega y corte distintos.'
+            : 'Ejecutiva, Virtual y Posgrados: apertura → corte como cierre.'
+        }}
+      </p>
+      @if (block.id === 'profesionalizante') {
+        <p>
+          Columna de origen “Fecha de entrega” interpretada como corte/cierre según la regla del
+          piloto.
+        </p>
+      }
+      <div
+        class="table-scroll"
+        tabindex="0"
+        [attr.aria-label]="'Tabla de ' + block.label"
+        role="region"
+      >
+        <table class="report-table" [attr.aria-label]="block.label">
+          <thead>
+            <tr>
+              <th scope="col">Origen / actividad</th>
+              <th scope="col">Ponderación de origen</th>
+              <th scope="col">Apertura</th>
+              <th scope="col">Entrega</th>
+              <th scope="col">Corte / cierre</th>
+              <th scope="col">Recordatorio interno</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of block.rows; track r.hoja + ':' + r.fila) {
+              <tr>
+                <td data-label="Origen / actividad">
+                  {{ r.hoja }} · Fila {{ r.fila }}<br />
+                  <strong>Unidad {{ +r.unidad.slice(1) }} · {{ r.actividad }}</strong>
+                </td>
+                <td data-label="Ponderación de origen">
+                  {{ r.ponderacion }}%<br />{{ r.parcial ?? 'Dentro del bloque' }}
+                </td>
+                <td data-label="Apertura">{{ r.apertura | date: 'dd/MM/yyyy HH:mm' : '-0500' }}</td>
+                <td data-label="Entrega">
+                  {{
+                    r.entrega
+                      ? (r.entrega | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                      : 'No aplica; se usa cierre'
+                  }}
+                </td>
+                <td data-label="Corte / cierre">
+                  {{ r.corte | date: 'dd/MM/yyyy HH:mm' : '-0500' }}
+                </td>
+                <td data-label="Recordatorio interno">{{ r.recordatorio ?? 'No configurado' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </details>
+  } @empty {
+    <p role="status">
+      Sin actividades de calendario para estos filtros. No se usan datos de otro ciclo.
+    </p>
+  }
+</section>

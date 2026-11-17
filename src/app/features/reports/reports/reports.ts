@@ -15,6 +15,7 @@ import {
   TYPE_LABELS,
 } from '../../../core/reporting/report-models';
 import { reportCut, selectReport } from '../../../core/reporting/report-selectors';
+import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/calendar-schedule-view';
 
 @Component({
   selector: 'app-reports',
@@ -25,6 +26,7 @@ import { reportCut, selectReport } from '../../../core/reporting/report-selector
     MatFormFieldModule,
     MatSelectModule,
     ContextFilters,
+    CalendarScheduleView,
   ],
   templateUrl: './reports.html',
   styleUrl: './reports.scss',

@@ -1,4 +1,8 @@
 @use '../../../shared/report-layout';
+.input-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .metric-card {
   padding: 20px;
   strong {

@@ -1,4 +1,5 @@
 import { AcademicCatalog, QueryContext } from '../models';
+import { scheduleModalities } from './calendar-schedule';
 import {
   ACTIVITY_TYPES,
   CalendarRow,
@@ -69,6 +70,18 @@ export function selectReport(
 ) {
   const sources = batches.filter((b) => b.ciclo === context.periodo);
   const allCalendar = sources.find((b) => b.tipo === 'calendario')?.filas ?? [];
+  const scheduling = sources.find((b) => b.tipo === 'calendario')?.programacion;
+  const needsLinking = !!scheduling?.length;
+  const schedule = (scheduling ?? []).filter(
+    (a) =>
+      (context.modalidad === 'todas' || scheduleModalities(a.bloque).includes(context.modalidad)) &&
+      (context.unidad === 'todas' || context.unidad === a.unidad) &&
+      (context.tipo === 'todos' || context.tipo === a.tipo) &&
+      context.carrera === 'todas' &&
+      context.grupo === 'todos' &&
+      context.docente === 'todos' &&
+      context.asignatura === 'todas',
+  );
   const roster = sources.find((b) => b.tipo === 'spai')?.filas ?? [];
   const grades = sources.find((b) => b.tipo === 'calificaciones')?.filas ?? [];
   const withdrawals = sources.find((b) => b.tipo === 'bajas')?.filas ?? [];
@@ -181,6 +194,8 @@ export function selectReport(
     };
   };
   return {
+    schedule,
+    needsLinking,
     calendar,
     catalog: reportCatalog(allCalendar),
     records: filtered,
@@ -190,7 +205,10 @@ export function selectReport(
     issues,
     excluded,
     complete:
-      !missingSources.length && !issues.length && !records.some((r) => r.state === 'sin-datos'),
+      !needsLinking &&
+      !missingSources.length &&
+      !issues.length &&
+      !records.some((r) => r.state === 'sin-datos'),
     types: ACTIVITY_TYPES.map((type) => ({
       type,
       ...count(filtered.filter((r) => r.calendar.tipo === type)),
