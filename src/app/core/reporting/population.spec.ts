@@ -70,10 +70,10 @@ describe('Población activa Saeko × imparticiones SPAI', () => {
     expect(x.proposed[0].motivo).toContain('5 → TUP5');
     expect(x.issues.some((i) => i.motivo.includes('Formato de matrícula inválido'))).toBe(true);
     rows[0].celdaNumerica = true;
-    rows[0].matriculas = '0005';
+    rows[0].matriculas = '5';
     x = crossPopulation('p01', [roster, catalog])!;
     expect(x.links.some((l) => l.person.id === 'TUP0005')).toBe(false);
-    expect(x.issues[0].motivo).toContain('ceros originales');
+    expect(x.issues[0].motivo).toContain('Sin coincidencia exacta');
     expect(['TUP1.0', '123', 'TUP 12', 'TUP１２'].some(validRegistration)).toBe(false);
   });
   it('diferencia 0027 de 27 y acepta cinco o más dígitos sin convertirlos en números', () => {
@@ -90,6 +90,27 @@ describe('Población activa Saeko × imparticiones SPAI', () => {
     expect(matches.map((l) => l.person.id).sort()).toEqual(digits.map((d) => 'TUP' + d).sort());
   });
 
+  it('no redondea una fracción a matrícula, ni confirma un número exacto con curso ambiguo', () => {
+    const { roster, catalog, rows } = sources();
+    roster.filas[4].matricula = 'TUP10201';
+    rows[0].celdaNumerica = true;
+    for (const raw of ['10201.00000000000000001', '-10201', '1020100000000000']) {
+      rows[0].matriculas = raw;
+      const x = crossPopulation('p01', [roster, catalog])!;
+      expect(x.links.some((l) => l.person.id === 'TUP10201')).toBe(false);
+      expect(x.issues.some((i) => i.motivo.includes('precisión fiable'))).toBe(true);
+    }
+    rows[0].matriculas = '1.0201E4';
+    expect(
+      crossPopulation('p01', [roster, catalog])!.links.some((l) => l.person.id === 'TUP10201'),
+    ).toBe(true);
+    rows.push({ ...rows[0], grupo: 'C.A', fila: 30 });
+    const x = crossPopulation('p01', [roster, catalog])!;
+    expect(x.links.some((l) => l.person.id === 'TUP10201')).toBe(false);
+    expect(
+      x.issues.some((i) => i.fila === 30 && i.motivo.includes('Localizador y título repetidos')),
+    ).toBe(true);
+  });
   it('rechaza un padrón ambiguo y una fecha de corte imposible antes de activar', () => {
     const { roster } = sources();
     roster.filas[1].matricula = ' tup0001 ';

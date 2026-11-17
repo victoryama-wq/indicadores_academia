@@ -1,7 +1,7 @@
 import type { Validation } from './report-models';
 import {
   canonical,
-  cycleFrom,
+  declaredCycles,
   fold,
   registration,
   validRegistration,
@@ -91,11 +91,21 @@ export function validatePopulation(
     if (result.errors.length !== before) continue;
     const val = (k: string) => r[k] as string;
     const source = { hoja, fila, cicloOrigen: val('cicloOrigen') };
-    if (cycleFrom(source.cicloOrigen) !== cycle)
+    const cycles = declaredCycles(source.cicloOrigen);
+    if (!cycles.length || cycles.some((c) => c !== cycle))
       reject('El ciclo de origen no coincide con el seleccionado.');
     const group = val('grupo');
-    for (const g of [group, ...(saeko ? [] : val('comparte').split(/[,;\n]/))])
-      if (cycleFrom(g) && cycleFrom(g) !== cycle) reject('Grupo de otro ciclo.');
+    for (const [label, g] of [
+      [saeko ? 'Grupo' : 'Grupo base', group],
+      ...(saeko
+        ? []
+        : val('comparte')
+            .split(/[,;\n]/)
+            .map((g) => ['Comparte con', g])),
+    ]) {
+      if (declaredCycles(g).some((c) => c !== cycle))
+        reject(label + ': ciclo ajeno o contradictorio en ' + g.trim() + '.');
+    }
     let key: string, resumen: string;
     if (saeko) {
       const matricula = val('matricula');
@@ -150,6 +160,14 @@ export function validatePopulation(
   return result;
 }
 
+class XlsxNumber {
+  constructor(readonly literal: string) {}
+}
+export const populationXlsxOptions = {
+  trim: false,
+  parseNumber: (raw: string) => new XlsxNumber(raw),
+};
+
 type Sheet = { sheet: string; data: unknown[][] };
 const rosterColumns = {
   matricula: 'MATRICULA',
@@ -200,10 +218,18 @@ export function parsePopulationSheets(sheets: Sheet[], type: Kind, cycle: string
     for (const [key, title] of Object.entries(columns)) {
       const v = r[labels.indexOf(title)];
       row[key] =
-        typeof v === 'number' && (key === 'numero' || key === 'matriculas') ? String(v) : (v ?? '');
+        v instanceof XlsxNumber && key === 'matriculas'
+          ? v.literal
+          : v instanceof XlsxNumber && key === 'numero'
+            ? String(Number(v.literal))
+            : typeof v === 'number' && (key === 'numero' || key === 'matriculas')
+              ? String(v)
+              : (v ?? '');
     }
-    if (!saeko)
-      row['celdaNumerica'] = typeof r[labels.indexOf(courseColumns.matriculas)] === 'number';
+    if (!saeko) {
+      const value = r[labels.indexOf(courseColumns.matriculas)];
+      row['celdaNumerica'] = value instanceof XlsxNumber || typeof value === 'number';
+    }
     if (
       saeko &&
       labels.includes('ESTADO DE INSCRIPCION') &&

@@ -100,3 +100,68 @@ test('Sistemas activa el padrón y las asignaciones XLSX, conserva la versión e
   await expect(calendar).toContainText('63 actividades');
   await expect(population).toContainText('Población vinculada: 0 estudiantes únicos');
 });
+
+test('SPAI XLSX distingue números de texto y rechaza grupos ajenos sin reemplazar vínculos', async ({
+  page,
+}) => {
+  await page.goto('/reportes');
+  await page.getByRole('combobox', { name: 'Perfil simulado' }).click();
+  await page.getByRole('option', { name: 'Sistemas', exact: true }).click();
+  await page.goto('/admin/insumos?periodo=p01');
+  const roster = populationSample('saeko', 'p01');
+  if (roster.tipo !== 'saeko') throw Error('muestra');
+  roster.filas = ['10201', '0027', '1234567890123456'].map((digits, i) => ({
+    ...roster.filas[i],
+    matricula: 'TUP' + digits,
+    grupo: 'C.A',
+  }));
+  const people = page.getByTestId('input-saeko'),
+    courses = page.getByTestId('input-spai');
+  await people
+    .locator('input[type=file]')
+    .setInputFiles({
+      name: 'padron-ficticio.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(roster)),
+    });
+  await people.getByRole('button', { name: 'Validar archivo' }).click();
+  await people.getByRole('button', { name: 'Activar simulación' }).click();
+  await expect(people.getByRole('status')).toContainText('Activación simulada completada');
+  async function upload(name: string) {
+    await courses
+      .locator('input[type=file]')
+      .setInputFiles(resolve('e2e/fixtures/' + name + '-ficticio.xlsx'));
+    await courses.getByRole('button', { name: 'Validar archivo' }).click();
+  }
+  await upload('spai-matriculas');
+  const preview = courses.locator('app-population-view');
+  await preview.getByText('Consultar filas y evidencia del cruce').click();
+  await preview.getByLabel('Detalle del cruce').selectOption('vinculos');
+  const links = preview.getByRole('listitem');
+  await expect(links).toHaveCount(3);
+  await expect(links.nth(0)).toContainText(/TUP10201 .*Materia ficticia 1/);
+  await expect(links.nth(1)).toContainText(/TUP10201 .*Materia ficticia 2/);
+  await expect(links.nth(2)).toContainText(/TUP0027 .*Materia ficticia 4/);
+  await preview.getByLabel('Detalle del cruce').selectOption('incidencias');
+  await expect(preview).toContainText('27 · Sin coincidencia exacta');
+  await expect(preview).toContainText('precisión fiable');
+  await courses.getByRole('button', { name: 'Activar simulación' }).click();
+  await expect(courses.getByRole('status')).toContainText('Activación simulada completada');
+  const version = await courses.getByTestId('current-version').innerText();
+  await upload('spai-ciclos-invalidos');
+  const rejected = courses
+    .getByRole('table', { name: 'Rechazos de validación' })
+    .locator('tbody tr');
+  await expect(rejected).toHaveCount(4);
+  for (const [i, field] of ['Grupo base', 'Grupo base', 'Comparte con', 'Comparte con'].entries()) {
+    await expect(rejected.nth(i).locator('td').nth(1)).toHaveText(String(i + 3));
+    await expect(rejected.nth(i)).toContainText(field);
+  }
+  await expect(courses.locator('app-population-view')).toHaveCount(0);
+  await expect(courses.getByRole('button', { name: 'Activar simulación' })).toBeDisabled();
+  await page.reload();
+  await expect(courses.getByTestId('current-version')).toHaveText(version);
+  await expect(page.locator('app-population-view')).toContainText(
+    '3 vínculos estudiante–asignatura confirmados',
+  );
+});

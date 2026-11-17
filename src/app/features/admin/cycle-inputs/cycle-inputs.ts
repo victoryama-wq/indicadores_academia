@@ -102,10 +102,10 @@ export class CycleInputs {
           imported = await readCalendarXlsx(file, cycle);
         } else {
           const { default: read } = await import('read-excel-file/universal');
-          const { parsePopulationSheets } =
+          const { parsePopulationSheets, populationXlsxOptions } =
             await import('../../../core/reporting/population-import');
           imported = parsePopulationSheets(
-            await read(await file.arrayBuffer(), { trim: false }),
+            await read(await file.arrayBuffer(), populationXlsxOptions),
             type,
             cycle,
           );
