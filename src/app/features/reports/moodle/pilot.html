@@ -133,7 +133,22 @@
           {{ labels[status] }} ({{ missingUnknown ? 'No calculable' : groups()[status].length }})
         </h2>
         @if (missingUnknown) {
-          <p class="notice neutral">{{ data.scopeReason }}</p>
+          <p class="notice neutral">
+            {{ data.scopeReason || 'Falta verificar los destinatarios de esta lectura.' }}
+          </p>
+          <p>
+            Revisa los destinatarios en la
+            <a
+              [href]="
+                'https://moodle2.tecplayacar.edu.mx/mod/assign/view.php?id=' +
+                data.activity.cmid +
+                '&action=grading'
+              "
+              target="_blank"
+              rel="noopener noreferrer"
+              >tabla de calificación de Moodle</a
+            >. Cuando Sistemas guarde el cotejo de la actividad, pulsa «Actualizar lectura».
+          </p>
         } @else if (!groups()[status].length) {
           <p class="notice neutral">Ningún estudiante en este estado.</p>
         } @else {

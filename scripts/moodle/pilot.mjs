@@ -2,7 +2,7 @@ import { text } from 'node:stream/consumers';
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
-import { extname } from 'node:path';
+import { extname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { moodleReader } from './reader.mjs';
 
@@ -82,17 +82,83 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     : process.env.MOODLE_TOKEN?.trim();
   delete process.env.MOODLE_TOKEN;
   if (!token) throw new Error('Proporciona el token al iniciar el piloto desde PowerShell.');
-  await access(new URL('index.html', dist)).catch(() => {
-    throw new Error('Ejecuta npm run build antes de iniciar el piloto.');
-  });
-  const key = randomBytes(32).toString('base64url');
-  pilotServer(moodleReader(token), key)
-    .once('error', () => {
-      console.error('No se pudo abrir el puerto local 4380.');
+  const coveragePath =
+    process.env.MOODLE_COBERTURA_LOCAL ||
+    (process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'cotejo-moodle.json'));
+  const reader = moodleReader(
+    token,
+    fetch,
+    coveragePath
+      ? async () => {
+          try {
+            return JSON.parse((await readFile(coveragePath, 'utf8')).replace(/^\uFEFF/, ''));
+          } catch (error) {
+            if (error.code === 'ENOENT') return undefined;
+            throw error;
+          }
+        }
+      : undefined,
+  );
+  const probe = process.argv.indexOf('--comprobar-participantes');
+  if (probe !== -1) {
+    const assignmentId = Number(process.argv[probe + 1]);
+    let site;
+    try {
+      site = await reader.siteInfo();
+      console.log(
+        'Versión instalada:',
+        site.release ?? 'no informada',
+        '| build:',
+        site.version ?? 'no informado',
+      );
+      if (Array.isArray(site.functions))
+        console.log(
+          'Función mod_assign_list_participants anunciada:',
+          site.functions.some((fn) => fn.name === 'mod_assign_list_participants') ? 'sí' : 'no',
+        );
+    } catch (error) {
+      console.log('Diagnóstico de identidad:', error.message);
       process.exitCode = 1;
-    })
-    .listen(4380, '127.0.0.1', () => {
-      console.log('Abre ' + origin + '/reportes');
-      console.log('Clave local de esta ejecución: ' + key);
+    }
+    try {
+      const context = await reader.catalog();
+      const activity = context.activities.find((a) => a.id === assignmentId && a.supported);
+      if (!activity) throw new Error('Selecciona una tarea individual del catálogo del piloto.');
+      console.log('Curso:', context.courseId, '| tarea:', activity.id, '| módulo:', activity.cmid);
+      const rows = await reader.participants(assignmentId);
+      if (!Array.isArray(rows))
+        throw new Error('Respuesta incompleta en mod_assign_list_participants.');
+      console.log('Filas visibles:', rows.length);
+      if (site) {
+        const others = rows.filter((r) => r.id !== site.userid);
+        console.log('Filas de la cuenta del token:', rows.length - others.length);
+        console.log(
+          'Filas restantes con estado explícito vacío o nuevo:',
+          others.filter(
+            (r) => ['', 'new'].includes(r.submissionstatus) && [false, 0].includes(r.submitted),
+          ).length,
+        );
+      }
+      console.log(
+        'El alcance se comprueba por identidad contra los destinatarios efectivos en Moodle.',
+      );
+    } catch (error) {
+      console.log('Diagnóstico de participantes:', error.message);
+      process.exitCode = 1;
+    }
+  } else {
+    await access(new URL('index.html', dist)).catch(() => {
+      throw new Error('Ejecuta npm run build antes de iniciar el piloto.');
     });
+    const key = randomBytes(32).toString('base64url');
+    pilotServer(reader, key)
+      .once('error', () => {
+        console.error('No se pudo abrir el puerto local 4380.');
+        process.exitCode = 1;
+      })
+      .listen(4380, '127.0.0.1', () => {
+        console.log('Abre ' + origin + '/reportes');
+        console.log('Clave local de esta ejecución: ' + key);
+      });
+  }
 }

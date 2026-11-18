@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { classify, moodleReader } from './reader.mjs';
+import { cotejarCurso } from './cotejar-curso.mjs';
 import { pilotServer } from './pilot.mjs';
 
 const users = Array.from({ length: 24 }, (_, i) => ({
@@ -34,8 +35,29 @@ const wrap = (field, rows) => ({
   assignments: [{ assignmentid: id, [field]: rows }],
   warnings: [],
 });
+const site = { userid: 900, version: '2025010100', release: 'Demo' };
+const visible = (id, status = '') => ({
+  id,
+  submissionstatus: status,
+  submitted: status === 'submitted',
+});
+const rows = users.map((u) => visible(u.id, u.id <= 20 ? 'submitted' : ''));
+function evidence(userIds = users.map((u) => u.id)) {
+  return {
+    courseId: 4455,
+    assignmentId: id,
+    cmid: activity.cmid,
+    serviceUserId: site.userid,
+    version: site.version,
+    userIds,
+    verifiedAt: new Date(Date.now() - 60000).toISOString(),
+    validUntil: new Date(Date.now() + 60000).toISOString(),
+  };
+}
 function api(overrides = {}, readAudience) {
   const responses = {
+    core_webservice_get_site_info: site,
+    mod_assign_list_participants: rows,
     mod_assign_get_assignments: catalog,
     core_enrol_get_enrolled_users: users,
     mod_assign_get_submissions: wrap('submissions', submissions),
@@ -43,27 +65,83 @@ function api(overrides = {}, readAudience) {
     ...overrides,
   };
   const calls = [];
-  const reader = moodleReader(
-    'ficticio',
-    async (url, options) => {
-      assert.equal(new URL(url).pathname, '/webservice/rest/server.php');
-      assert.equal(new URL(url).search, '');
-      assert.equal(options.method, 'POST');
-      const fn = options.body.get('wsfunction');
-      assert.ok(Object.hasOwn(responses, fn));
-      calls.push([fn, Object.fromEntries(options.body)]);
-      return Response.json(responses[fn]);
-    },
-    readAudience,
-  );
-  return { reader, calls };
+  const request = async (url, options) => {
+    assert.equal(new URL(url).pathname, '/webservice/rest/server.php');
+    assert.equal(new URL(url).search, '');
+    assert.equal(options.method, 'POST');
+    const fn = options.body.get('wsfunction');
+    assert.ok(Object.hasOwn(responses, fn));
+    calls.push([fn, Object.fromEntries(options.body)]);
+    return Response.json(responses[fn]);
+  };
+  const reader = moodleReader('ficticio', request, readAudience ? () => readAudience() : undefined);
+  return { reader, calls, request };
 }
 
-test('El curso y la tarea usan sus propios identificadores y los totales salen de las filas individuales', async () => {
-  const { reader, calls } = api({}, ({ courseId, assignmentId, cmid }) => {
-    assert.deepEqual([courseId, assignmentId, cmid], [4455, id, activity.cmid]);
-    return { kind: 'course' };
+test('Un cotejo de curso completo usa el padrón activo y verifica cada identidad y estado de la tarea', async () => {
+  const until = new Date(Date.now() + 60000).toISOString();
+  const fixture = api({
+    core_enrol_get_enrolled_users: [...users, { id: site.userid, username: 'TUP0900' }],
+    mod_assign_list_participants: [...rows, visible(site.userid)],
   });
+  const result = await cotejarCurso('ficticio', id, 24, until, fixture.request);
+  assert.deepEqual(
+    result.evidence.userIds,
+    users.map((u) => u.id),
+  );
+  assert.deepEqual(
+    result.snapshot.students
+      .filter((r) => r.state === 'sin-entrega')
+      .map((r) => r.registration)
+      .sort(),
+    ['TUP0021', 'TUP0022', 'TUP0023', 'TUP0024'],
+  );
+  for (const response of [
+    rows.slice(1),
+    [...rows.slice(1), visible(47)],
+    [...rows.slice(0, 23), visible(24, 'draft')],
+  ]) {
+    await assert.rejects(
+      cotejarCurso(
+        'ficticio',
+        id,
+        24,
+        until,
+        api({ mod_assign_list_participants: response }).request,
+      ),
+      /Cotejo incompleto/,
+    );
+  }
+  await assert.rejects(
+    cotejarCurso('ficticio', id, 23, until, fixture.request),
+    /Cotejo incompleto/,
+  );
+});
+
+test('Un alta en el curso invalida el cotejo completo aunque la tabla de la tarea no la muestre', async () => {
+  const until = new Date(Date.now() + 60000).toISOString();
+  const { evidence: saved } = await cotejarCurso(
+    'ficticio',
+    id,
+    users.length,
+    until,
+    api().request,
+  );
+  const { reader } = api(
+    {
+      core_enrol_get_enrolled_users: [...users, { id: 47, username: 'TUP0047' }],
+    },
+    () => saved,
+  );
+  const snapshot = await reader.snapshot(id);
+  assert.equal(snapshot.expectedCount, null);
+  assert.equal(snapshot.students.filter((row) => row.state === 'sin-entrega').length, 0);
+  assert.equal(snapshot.students.filter((row) => row.state === 'calificadas').length, 18);
+});
+
+test('El curso y la tarea usan sus propios identificadores y los totales salen de las filas individuales', async () => {
+  const { reader, calls } = api({}, evidence);
+
   const result = await reader.snapshot(id);
   assert.equal(result.activity.cmid, 53765);
   assert.equal(result.students.length, 24);
@@ -98,10 +176,11 @@ test('La matrícula de curso y la visibilidad técnica no prueban el alcance de 
 });
 
 test('Una población verificada de grupo excluye a los demás, incluso después de actualizar', async () => {
-  let audience = { kind: 'restricted', userIds: [1, 2] };
+  let audience = evidence([1, 2]);
   const { reader } = api(
     {
       core_enrol_get_enrolled_users: users.slice(0, 3),
+      mod_assign_list_participants: [visible(1, 'submitted'), visible(2)],
       mod_assign_get_submissions: wrap('submissions', submissions.slice(0, 1)),
       mod_assign_get_grades: wrap('grades', grades.slice(0, 1)),
     },
@@ -117,16 +196,117 @@ test('Una población verificada de grupo excluye a los demás, incluso después 
       ['TUP0002', 'sin-entrega'],
     ],
   );
-  audience = { kind: 'restricted', userIds: [3] };
+  audience = evidence([3]);
   const conflicting = await reader.snapshot(id);
   assert.equal(conflicting.expectedCount, null);
-  assert.match(conflicting.scopeReason, /fuera/);
+  assert.match(conflicting.scopeReason, /difieren/);
   assert.deepEqual(
     conflicting.students.map((r) => r.state),
     ['calificadas'],
   );
 });
 
+for (const present of [true, false]) {
+  test(
+    'Cuatro identidades sin entrega con la cuenta técnica ' + (present ? 'presente' : 'ausente'),
+    async () => {
+      const technical = { id: site.userid, username: 'tup00001', fullname: users[0].fullname };
+      const { reader, calls } = api(
+        {
+          core_enrol_get_enrolled_users: [...users, technical],
+          mod_assign_list_participants: present ? [...rows, visible(technical.id)] : rows,
+        },
+        evidence,
+      );
+      const snap = await reader.snapshot(id);
+      assert.equal(snap.identifiedCount, 24);
+      assert.equal(snap.expectedCount, 24);
+      assert.equal(snap.unidentified, 0);
+      assert.deepEqual(
+        snap.students
+          .filter((s) => s.state === 'sin-entrega')
+          .map((s) => s.registration)
+          .sort(),
+        ['TUP0021', 'TUP0022', 'TUP0023', 'TUP0024'],
+      );
+      assert.equal(snap.students.find((s) => s.registration === 'TUP0001').state, 'calificadas');
+      assert.equal(
+        snap.students.some((s) => s.registration === 'TUP00001'),
+        false,
+      );
+      const params = calls.find(([fn]) => fn === 'mod_assign_list_participants')[1];
+      assert.deepEqual(
+        [params.assignid, params.groupid, params.filter, params.skip, params.limit],
+        [String(id), '0', '', '0', '0'],
+      );
+    },
+  );
+}
+test('Una lectura parcial o no autorizada conserva la evidencia directa y oculta faltantes', async () => {
+  for (const partial of [
+    rows.slice(1),
+    [...rows.slice(1), visible(99)],
+    [...rows, rows[0]],
+    rows.map((r) => (r.id === 24 ? { id: 24, submitted: false } : r)),
+    rows.map((r) => (r.id === 24 ? visible(24, 'draft') : r)),
+    { exception: 'denied' },
+  ]) {
+    const snap = await api({ mod_assign_list_participants: partial }, evidence).reader.snapshot(id);
+    assert.equal(snap.expectedCount, null);
+    assert.ok(snap.scopeReason);
+    assert.equal(snap.students.filter((s) => s.state === 'sin-entrega').length, 0);
+    assert.equal(snap.students.filter((s) => s.state === 'calificadas').length, 18);
+    assert.equal(snap.students.filter((s) => s.state === 'pendientes').length, 2);
+  }
+});
+test('El cotejo está ligado a versión, cuenta, curso, módulo, tarea y vigencia', async () => {
+  for (const change of [
+    { version: 'otra' },
+    { serviceUserId: 2 },
+    { courseId: 2 },
+    { cmid: 2 },
+    { assignmentId: 2 },
+    { validUntil: '2020-01-01T00:00:00Z' },
+  ]) {
+    const snap = await api({}, () => ({ ...evidence(), ...change })).reader.snapshot(id);
+    assert.equal(snap.expectedCount, null);
+  }
+});
+test('Cada corte relee entregas, borradores y casos por revisar de los destinatarios', async () => {
+  const liveRows = rows.map((row) => ({ ...row }));
+  const liveSubmissions = [...submissions];
+  const { reader } = api(
+    {
+      mod_assign_list_participants: liveRows,
+      mod_assign_get_submissions: wrap('submissions', liveSubmissions),
+    },
+    evidence,
+  );
+  const initial = await reader.snapshot(id);
+  for (const [userId, status] of [
+    [21, 'submitted'],
+    [22, 'draft'],
+    [23, 'reopened'],
+  ]) {
+    liveRows[userId - 1] = visible(userId, status);
+    liveSubmissions.push({ userid: userId, status, attemptnumber: 1 });
+  }
+  const updated = await reader.snapshot(id);
+  assert.deepEqual(
+    updated.students.filter((s) => s.state === 'sin-entrega').map((s) => s.registration),
+    ['TUP0024'],
+  );
+  assert.equal(updated.students.filter((s) => s.state === 'pendientes').length, 3);
+  assert.equal(updated.students.find((s) => s.registration === 'TUP0022').state, 'borradores');
+  assert.equal(updated.students.find((s) => s.registration === 'TUP0023').state, 'revisar');
+  assert.equal(initial.students.filter((s) => s.state === 'sin-entrega').length, 4);
+});
+test('Una identidad de servicio no verificable impide atribuir resultados académicos', async () => {
+  await assert.rejects(
+    api({ core_webservice_get_site_info: { version: site.version } }).reader.snapshot(id),
+    /incompletos/,
+  );
+});
 test('Una nota de un intento previo no califica la nueva entrega y el borrador sigue separado', () => {
   const newer = [
     { userid: 1, attemptnumber: 1, status: 'submitted' },
@@ -158,10 +338,11 @@ test('Moodle puede devolver un aviso específico por falta de registros', async 
   const warning = (item) => [{ item, itemid: id, warningcode: '3' }];
   const { reader } = api(
     {
+      mod_assign_list_participants: users.map((u) => visible(u.id)),
       mod_assign_get_grades: { assignments: [], warnings: warning('assignment') },
       mod_assign_get_submissions: { ...wrap('submissions', []), warnings: warning('module') },
     },
-    () => ({ kind: 'course' }),
+    evidence,
   );
   assert.equal(
     (await reader.snapshot(id)).students.filter((r) => r.state === 'sin-entrega').length,

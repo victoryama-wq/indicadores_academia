@@ -35,11 +35,43 @@ export function moodleReader(token, request = fetch, readAudience) {
       result.errorcode ||
       list(result.warnings ?? []).some((w) => !emptyWarning?.(w))
     ) {
+      const reason = [
+        'accessexception',
+        'webservice_access_exception',
+        'invalidtoken',
+        'invalidparameter',
+        'nopermissions',
+        'requireloginerror',
+      ].includes(result?.errorcode)
+        ? ' (' + result.errorcode + ')'
+        : '';
       throw new Error(
-        'Consulta incompleta en ' + fn + '. Revisa el servicio y los permisos de la cuenta.',
+        'Consulta incompleta en ' +
+          fn +
+          reason +
+          '. Revisa el servicio y los permisos de la cuenta.',
       );
     }
     return result;
+  }
+
+  async function siteInfo() {
+    const site = await read('core_webservice_get_site_info', {});
+    if (!Number.isSafeInteger(site.userid) || site.userid < 1) throw invalid();
+    return site;
+  }
+
+  function participants(id) {
+    return read('mod_assign_list_participants', {
+      assignid: String(id),
+      groupid: '0',
+      filter: '',
+      skip: '0',
+      limit: '0',
+      onlyids: '1',
+      includeenrolments: '0',
+      tablesort: '0',
+    });
   }
 
   async function catalog() {
@@ -75,7 +107,7 @@ export function moodleReader(token, request = fetch, readAudience) {
     const filter = { 'assignmentids[0]': String(id) };
     const empty = (item) => (w) =>
       String(w.warningcode) === '3' && w.item === item && Number(w.itemid) === id;
-    const [users, deliveries, marks] = await Promise.all([
+    const [users, deliveries, marks, site] = await Promise.all([
       read('core_enrol_get_enrolled_users', {
         courseid: String(courseId),
         'options[0][name]': 'onlyactive',
@@ -83,6 +115,7 @@ export function moodleReader(token, request = fetch, readAudience) {
       }),
       read('mod_assign_get_submissions', filter, empty('module')),
       read('mod_assign_get_grades', filter, empty('assignment')),
+      siteInfo(),
     ]);
     function records(envelope, field) {
       const blocks = list(envelope.assignments);
@@ -91,21 +124,32 @@ export function moodleReader(token, request = fetch, readAudience) {
       if (blocks.length !== 1 || blocks[0].assignmentid !== id) throw invalid();
       return list(blocks[0][field]);
     }
-    // El servicio actual no acredita los destinatarios por actividad.
-    const audience = await readAudience?.({ courseId, assignmentId: id, cmid: activity.cmid });
+    const submissions = records(deliveries, 'submissions');
+    const academicUsers = list(users).filter((user) => user.id !== site.userid);
+    let audience;
+    try {
+      const rows = await participants(id);
+      const activeUserIds = academicUsers.filter(registrationOf).map((u) => u.id);
+      const evidence = await readAudience?.({
+        courseId,
+        activity,
+        site,
+        activeUserIds,
+      });
+      audience = verifiedAudience(rows, submissions, site, activity, evidence, activeUserIds);
+    } catch {
+      audience = {
+        reason: 'No se pudo verificar la tabla de participantes de la tarea o su cotejo local.',
+      };
+    }
     return {
       course: context.course,
       activity,
-      ...classify(
-        list(users),
-        records(deliveries, 'submissions'),
-        records(marks, 'grades'),
-        audience,
-      ),
+      ...classify(academicUsers, submissions, records(marks, 'grades'), audience),
       readAt: new Date().toISOString(),
     };
   }
-  return { catalog, snapshot };
+  return { catalog, snapshot, siteInfo, participants };
 }
 
 function latestByUser(rows) {
@@ -125,6 +169,76 @@ function latestByUser(rows) {
   return result;
 }
 
+// La tabla visible puede omitir grupos o incluir personas ajenas a una restricción.
+function verifiedAudience(rows, submissions, site, activity, evidence, activeUserIds) {
+  if (!Array.isArray(rows)) throw invalid();
+  if (
+    !evidence ||
+    evidence.courseId !== courseId ||
+    evidence.assignmentId !== activity.id ||
+    evidence.cmid !== activity.cmid ||
+    evidence.serviceUserId !== site.userid ||
+    !site.version ||
+    String(site.version) !== evidence.version ||
+    !(Date.parse(evidence.verifiedAt) <= Date.now() && Date.now() < Date.parse(evidence.validUntil))
+  ) {
+    return {
+      reason:
+        'Falta un cotejo vigente de restricciones, grupos y destinatarios de esta tarea para esta cuenta y versión de Moodle.',
+    };
+  }
+  const expectedIds = new Set(list(evidence.userIds));
+  if (
+    expectedIds.size !== evidence.userIds.length ||
+    expectedIds.has(site.userid) ||
+    [...expectedIds].some((id) => !Number.isSafeInteger(id) || id < 1)
+  )
+    throw invalid();
+  if (
+    evidence.scope === 'course' &&
+    (activeUserIds.length !== expectedIds.size || activeUserIds.some((id) => !expectedIds.has(id)))
+  ) {
+    return {
+      reason: 'La matrícula activa del curso cambió. Se requiere un nuevo cotejo de la tarea.',
+    };
+  }
+  const seen = new Set();
+  const deliveries = latestByUser(submissions);
+  for (const row of rows) {
+    if (!Number.isSafeInteger(row.id) || row.id < 1 || seen.has(row.id)) throw invalid();
+    seen.add(row.id);
+    if (row.id === site.userid) continue;
+    if (!expectedIds.has(row.id))
+      return { reason: 'Los destinatarios cotejados y la tabla visible de Moodle difieren.' };
+    const status = row.submissionstatus;
+    const direct = deliveries.get(row.id);
+    // Moodle usa cadena vacía para quien nunca inició un envío.
+    if (
+      !['', 'new', 'draft', 'submitted', 'reopened'].includes(status) ||
+      ![true, false, 0, 1].includes(row.submitted) ||
+      Boolean(row.submitted) !== (status === 'submitted') ||
+      (direct ? direct.status !== status : status !== '' && status !== 'new')
+    ) {
+      return {
+        reason: 'El estado de algún destinatario está incompleto o cambió entre consultas.',
+      };
+    }
+  }
+  if ([...expectedIds].some((id) => !seen.has(id))) {
+    return { reason: 'La cuenta no devolvió a todos los destinatarios cotejados.' };
+  }
+  return { kind: 'restricted', userIds: [...expectedIds] };
+}
+
+function registrationOf(user) {
+  const email = /^(tup\d+)@tecplayacar\.edu\.mx$/i
+    .exec(user.email?.trim() ?? '')?.[1]
+    ?.toUpperCase();
+  const username = /^tup\d+$/i.test(user.username ?? '') ? user.username.toUpperCase() : undefined;
+  if (email && username && email !== username) throw invalid();
+  return email ?? username;
+}
+
 export function classify(users, submissions, grades, audience) {
   const sent = latestByUser(submissions);
   const marks = latestByUser(grades);
@@ -136,14 +250,7 @@ export function classify(users, submissions, grades, audience) {
     registrations = new Set();
   let unidentified = 0;
   for (const user of users) {
-    const email = /^(tup\d+)@tecplayacar\.edu\.mx$/i
-      .exec(user.email?.trim() ?? '')?.[1]
-      ?.toUpperCase();
-    const username = /^tup\d+$/i.test(user.username ?? '')
-      ? user.username.toUpperCase()
-      : undefined;
-    if (email && username && email !== username) throw invalid();
-    const registration = email ?? username;
+    const registration = registrationOf(user);
     if (!registration) {
       unidentified++;
       continue;
@@ -200,6 +307,7 @@ export function classify(users, submissions, grades, audience) {
       ? null
       : hasConflictingEvidence
         ? 'Hay evidencia de actividad fuera de la población indicada.'
-        : 'El servicio de lectura no acredita la lista completa de destinatarios de esta tarea.',
+        : (audience?.reason ??
+          'El servicio de lectura no acredita la lista completa de destinatarios de esta tarea.'),
   };
 }

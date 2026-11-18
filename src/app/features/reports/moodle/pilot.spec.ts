@@ -73,6 +73,11 @@ describe('Lectura Moodle por actividad', () => {
     ] as const) {
       await harness.navigateByUrl('/reportes/moodle?actividad=22041&estado=' + state);
       expect(root.querySelectorAll('li').length).toBe(n);
+      if (state === 'sin-entrega') {
+        expect(
+          Array.from(root.querySelectorAll('.records li div small'), (el) => el.textContent),
+        ).toEqual(['TUP0021', 'TUP0022', 'TUP0023', 'TUP0024']);
+      }
     }
     expect(api).toHaveBeenCalledTimes(2);
     await harness.navigateByUrl('/reportes/moodle?actividad=22043');
