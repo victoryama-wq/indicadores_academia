@@ -10,6 +10,12 @@
   </div>
   <span class="pill green">Demostración local</span>
 </div>
+@if (localDemo && nav.profile() === 'sistemas') {
+  <p class="mb-5">
+    <a class="pilot-link" href="http://127.0.0.1:4380/reportes/moodle">Abrir piloto local de lectura Moodle</a> ·
+    Requiere el servicio local de Sistemas.
+  </p>
+}
 @if (inputs.status() === 'loading') {
   <section class="panel empty" role="status"><h2>Cargando insumos ficticios…</h2></section>
 } @else if (inputs.status() === 'error') {

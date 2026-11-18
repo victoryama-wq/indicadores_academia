@@ -36,6 +36,7 @@ import { CalendarScheduleView } from '../../../shared/calendar-schedule-view/cal
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Reports {
+  readonly localDemo = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   readonly nav = inject(NavigationContext);
   readonly inputs = inject(CycleInputStore);
   readonly cycles = CYCLES;

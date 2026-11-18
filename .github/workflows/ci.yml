@@ -40,6 +40,9 @@ jobs:
       - name: Verificar compatibilidad de dependencias
         run: npm run test:dependencies
 
+      - name: Verificar lector Moodle con datos ficticios
+        run: npm run test:moodle
+
   e2e-edge:
     name: E2E Edge
     runs-on: ubuntu-24.04
@@ -65,6 +68,12 @@ jobs:
 
       - name: Ejecutar E2E con Edge
         run: npm run test:e2e
+
+      - name: Compilar el piloto local
+        run: npm run build
+
+      - name: Validar piloto Moodle en Edge con datos ficticios
+        run: npm run test:moodle:ui
 
       - name: Conservar reporte y resultados de Playwright
         if: ${{ !cancelled() }}

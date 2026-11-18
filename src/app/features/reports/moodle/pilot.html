@@ -1,0 +1,176 @@
+<header class="page-heading">
+  <div>
+    <span class="eyebrow">REPORTES / MOODLE</span>
+    <h1>Seguimiento de tareas</h1>
+    <p>Piloto de lectura · Ciclo 27-1</p>
+  </div>
+  @if (key()) {
+    <button mat-stroked-button (click)="key.set('')">Cerrar consulta</button>
+  }
+</header>
+@if (!key()) {
+  <form class="panel access" (submit)="login(secret, $event)">
+    <span class="tile"><app-ui-icon name="settings" /></span>
+    <h2>Acceso de Sistemas</h2>
+    <label for="secret">Clave local del piloto</label>
+    <input
+      id="secret"
+      #secret
+      type="password"
+      required
+      autocomplete="off"
+      aria-describedby="key-help"
+    />
+    <small id="key-help">Usa la clave que aparece en la terminal al iniciar el piloto.</small>
+    <button mat-flat-button type="submit">Consultar curso <app-ui-icon name="arrowRight" /></button>
+  </form>
+} @else {
+  @if (catalog.isLoading()) {
+    <p class="notice info" role="status">Consultando el curso…</p>
+  }
+  @if (catalog.error(); as error) {
+    <div class="notice warning">
+      <p role="alert">{{ error.message }}</p>
+      <button mat-button (click)="catalog.reload()">Reintentar consulta</button>
+    </div>
+  }
+  @if (catalog.hasValue()) {
+    <section class="panel course">
+      <div class="course-title">
+        <span class="tile"><app-ui-icon name="book" /></span>
+        <div>
+          <span class="eyebrow">ASIGNATURA</span>
+          <h2>{{ catalog.value().course }}</h2>
+        </div>
+      </div>
+      <div>
+        <label for="actividad">Actividad</label>
+        <select
+          id="actividad"
+          #select
+          [value]="activity()?.id ?? ''"
+          (change)="choose(select.value)"
+        >
+          @if (!activity()) {
+            <option value="">Selecciona una actividad</option>
+          }
+          @for (a of catalog.value().activities; track a.id) {
+            <option [value]="a.id" [selected]="a.id === activity()?.id">{{ a.name }}</option>
+          }
+        </select>
+      </div>
+      @if (!catalog.value().activities.length) {
+        <p>No hay tareas visibles en este curso.</p>
+      }
+      @if (activity(); as a) {
+        @if (!a.supported) {
+          <p role="status">
+            La configuración de esta actividad requiere revisión antes del seguimiento individual.
+          </p>
+        }
+      }
+    </section>
+  }
+  @if (snapshot.isLoading()) {
+    <p class="notice info" role="status">Consultando estudiantes, entregas y calificaciones…</p>
+  }
+  @if (snapshot.error(); as error) {
+    <div class="notice warning">
+      <p role="alert">{{ error.message }}</p>
+      <button mat-button (click)="sequence.update(increment)">Reintentar lectura</button>
+    </div>
+  }
+  @if (snapshot.hasValue()) {
+    @let data = snapshot.value();
+    <div class="section-head">
+      <div>
+        <h2>Resumen de la actividad</h2>
+        <small
+          >Lectura del {{ data.readAt | date: 'dd/MM/yyyy HH:mm:ss' : '-0500' }} · Cancún</small
+        >
+      </div>
+      <button mat-stroked-button (click)="sequence.update(increment)">
+        <app-ui-icon name="history" /> Actualizar lectura
+      </button>
+    </div>
+    <section class="hero-banner overview" aria-label="Población y avance de calificación">
+      <div>
+        <span class="overview-number">{{ data.students.length }}</span
+        ><span>Estudiantes identificados</span>
+      </div>
+      <div>
+        <span class="overview-number">{{ sent() }}</span
+        ><span>Entregas con estado de calificación determinado</span>
+      </div>
+      <div class="progress-block">
+        <span>Avance de calificación</span
+        ><b>{{ gradedPercent() === null ? 'Sin entregas' : gradedPercent() + '%' }}</b>
+        <div class="track" aria-hidden="true"><i [style.width.%]="gradedPercent() ?? 0"></i></div>
+        <small>{{ groups().calificadas.length }} de {{ sent() }} entregas calificadas</small>
+      </div>
+    </section>
+    @if (state(); as status) {
+      <section class="panel detail">
+        <a mat-button routerLink="." [queryParams]="{ actividad: data.activity.id }"
+          ><app-ui-icon name="arrowLeft" /> Volver al resumen</a
+        >
+        <h2>{{ labels[status] }} ({{ groups()[status].length }})</h2>
+        @if (!groups()[status].length) {
+          <p class="notice neutral">Ningún estudiante en este estado.</p>
+        } @else {
+          <ul class="records">
+            @for (row of groups()[status]; track row.registration) {
+              <li>
+                <span class="tile"><app-ui-icon name="people" /></span>
+                <div>
+                  <strong>{{ row.name }}</strong
+                  ><small>{{ row.registration }}</small>
+                </div>
+                @if (row.updatedAt) {
+                  <small class="row-date"
+                    >Última modificación de la entrega<br />{{
+                      row.updatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500'
+                    }}</small
+                  >
+                }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    } @else {
+      <h2 class="state-heading">Estudiantes por estado</h2>
+      <div class="state-grid">
+        @for (s of keys; track s) {
+          <a
+            class="metric state-card"
+            [attr.data-state]="s"
+            routerLink="."
+            [queryParams]="{ actividad: data.activity.id, estado: s }"
+          >
+            <span class="tile"><app-ui-icon [name]="icons[s]" /></span>
+            <strong>{{ groups()[s].length }}</strong
+            ><span class="card-label">{{ labels[s] }}</span
+            ><app-ui-icon class="go" name="arrowRight" />
+          </a>
+        }
+      </div>
+    }
+    <aside class="panel scope">
+      <app-ui-icon name="info" />
+      <div>
+        <h3>Alcance de la lectura</h3>
+        <p>
+          Se cuentan los participantes activos visibles en Moodle con matrícula TUP identificada.
+          Cuentas sin matrícula identificable: <strong>{{ data.unidentified }}</strong
+          >.
+        </p>
+        <p>
+          El grupo de origen y la asignación requieren cotejo con Saeko y SPAI. El calendario
+          oficial de 27-1 está pendiente para determinar vencimientos.
+        </p>
+        <small>Curso 4455 · Módulo {{ data.activity.cmid }} · Tarea {{ data.activity.id }}</small>
+      </div>
+    </aside>
+  }
+}

@@ -1,0 +1,98 @@
+import { text } from 'node:stream/consumers';
+import { createServer } from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { access, readFile } from 'node:fs/promises';
+import { extname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { moodleReader } from './reader.mjs';
+
+const origin = 'http://127.0.0.1:4380';
+const dist = new URL('../../dist/indicadores-academia-demo/browser/', import.meta.url);
+const mime = {
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.html': 'text/html',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.woff2': 'font/woff2',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.woff': 'font/woff',
+};
+function sameKey(received, key) {
+  const actual = Buffer.from(received ?? ''),
+    expected = Buffer.from('Bearer ' + key);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+export function pilotServer(reader, key) {
+  return createServer(async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Frame-Options', 'DENY');
+    function json(status, value) {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(value));
+    }
+    const host = '127.0.0.1:' + req.socket.localPort;
+    if (
+      req.headers.host !== host ||
+      (req.headers.origin && req.headers.origin !== 'http://' + host)
+    )
+      return json(403, { error: 'Origen local requerido.' });
+    if (req.method !== 'GET') return json(405, { error: 'Método no disponible.' });
+    const path = req.url.split('?')[0];
+    if (path.startsWith('/api/')) {
+      if (!sameKey(req.headers.authorization, key))
+        return json(401, { error: 'La clave local del piloto es incorrecta.' });
+      try {
+        if (path === '/api/moodle/actividades') return json(200, await reader.catalog());
+        const match = /^\/api\/moodle\/actividades\/(\d+)$/.exec(path);
+        if (match) return json(200, await reader.snapshot(Number(match[1])));
+        return json(404, { error: 'Consulta fuera del piloto.' });
+      } catch (error) {
+        return json(502, {
+          error:
+            error instanceof Error &&
+            /^(Moodle |No se pudo |Consulta incompleta |El curso |Esta actividad |Ningún participante )/u.test(
+              error.message,
+            )
+              ? error.message
+              : 'No se pudo completar la lectura de Moodle.',
+        });
+      }
+    }
+    if (!/^\/(?:[\w.-]+\/)*[\w.-]*$/.test(path) || path.split('/').some((p) => p.startsWith('.')))
+      return json(404, { error: 'Ruta desconocida.' });
+    const file = extname(path) ? path.slice(1) : 'index.html';
+    if (!Object.hasOwn(mime, extname(file))) return json(404, { error: 'Archivo desconocido.' });
+    try {
+      const data = await readFile(new URL(file, dist));
+      res.writeHead(200, { 'Content-Type': mime[extname(file)] }).end(data);
+    } catch {
+      json(404, { error: 'Archivo no encontrado.' });
+    }
+  });
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const token = process.argv.includes('--token-stdin')
+    ? (await text(process.stdin)).trim()
+    : process.env.MOODLE_TOKEN?.trim();
+  delete process.env.MOODLE_TOKEN;
+  if (!token) throw new Error('Proporciona el token al iniciar el piloto desde PowerShell.');
+  await access(new URL('index.html', dist)).catch(() => {
+    throw new Error('Ejecuta npm run build antes de iniciar el piloto.');
+  });
+  const key = randomBytes(32).toString('base64url');
+  pilotServer(moodleReader(token), key)
+    .once('error', () => {
+      console.error('No se pudo abrir el puerto local 4380.');
+      process.exitCode = 1;
+    })
+    .listen(4380, '127.0.0.1', () => {
+      console.log('Abre ' + origin + '/reportes');
+      console.log('Clave local de esta ejecución: ' + key);
+    });
+}

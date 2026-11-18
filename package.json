@@ -8,7 +8,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
     "test:e2e": "playwright test",
-    "test:dependencies": "node --test scripts/dependency-compatibility.test.mjs"
+    "test:dependencies": "node --test scripts/dependency-compatibility.test.mjs",
+    "moodle:piloto": "node scripts/moodle/pilot.mjs",
+    "test:moodle": "node --test scripts/moodle/reader.test.mjs",
+    "test:moodle:ui": "node scripts/moodle/pilot.browser.mjs"
   },
   "private": true,
   "packageManager": "npm@11.11.0",
