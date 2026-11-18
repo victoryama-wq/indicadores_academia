@@ -50,7 +50,7 @@ const reader = {
 };
 const server = pilotServer(reader, 'demo-local');
 await new Promise((resolve, reject) =>
-  server.once('error', reject).listen(4380, '127.0.0.1', resolve),
+  server.once('error', reject).listen(0, '127.0.0.1', resolve),
 );
 let browser;
 try {
@@ -60,6 +60,24 @@ try {
       : { channel: 'msedge' },
   );
   const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  // Conserva el origen del piloto en Edge, incluso si Sistemas está usando el 4380.
+  // Todas las peticiones de esta página van exclusivamente al servidor ficticio.
+  const testOrigin = 'http://127.0.0.1:' + server.address().port;
+  await context.route('http://127.0.0.1:4380/**', async (route) => {
+    const url = new URL(route.request().url());
+    const headers = {
+      ...route.request().headers(),
+      host: server.address().address + ':' + server.address().port,
+    };
+    if (headers.origin === url.origin) headers.origin = testOrigin;
+    const response = await route.fetch({
+      url: testOrigin + url.pathname + url.search,
+      headers,
+      maxRedirects: 0,
+    });
+    await route.fulfill({ response });
+    await response.dispose();
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
@@ -96,7 +114,12 @@ try {
   await page.getByRole('link', { name: /Sin entrega/ }).click();
   await expect(page.getByRole('heading', { name: 'Sin entrega (4)' })).toBeVisible();
   assert.equal(await page.locator('li').count(), 4);
-  await expect(page.getByText(/TUP0024/)).toBeVisible();
+  await expect(page.locator('.records li div small')).toHaveText([
+    'TUP0021',
+    'TUP0022',
+    'TUP0023',
+    'TUP0024',
+  ]);
   await page.getByRole('link', { name: 'Volver al resumen' }).click();
   await page.getByRole('link', { name: /Entregas pendientes de calificar/ }).click();
   await expect(
