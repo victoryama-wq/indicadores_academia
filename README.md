@@ -25,7 +25,7 @@ Las pruebas E2E utilizan Microsoft Edge instalado (`channel: msedge`) y arrancan
 
 ## Integración continua
 
-El workflow [CI](.github/workflows/ci.yml) ejecuta el trabajo **Validación Angular** en pull requests dirigidos a `main`, pushes a `main` y ejecución manual desde Actions (cuando el workflow esté en la rama predeterminada). Usa Ubuntu 24.04, Node 24.14.1, caché de npm basada en `package-lock.json` y permisos `contents: read`. Ejecuta, en pasos separados y en este orden: `npm ci`, `npm run build`, `npm test` y `npm run test:dependencies`. Valida instalación, compilación, datos ficticios y compatibilidad de dependencias, sin credenciales de Firebase ni Moodle.
+El workflow [CI](.github/workflows/ci.yml) ejecuta el trabajo **Validación Angular** en pull requests dirigidos a `main`, pushes a `main` y ejecución manual desde Actions (cuando el workflow esté en la rama predeterminada). Usa Ubuntu 24.04, Node 24.14.1, caché de npm basada en `package-lock.json` y permisos `contents: read`. Ejecuta, en pasos separados y en este orden: `npm ci`, `npm run build`, `npm test`, `npm run test:dependencies` y `npm run test:moodle`. Valida instalación, compilación, datos ficticios y compatibilidad de dependencias, sin credenciales de Firebase ni Moodle.
 
 El job independiente **E2E Edge** usa Ubuntu 24.04, Node 24.14.1 y caché por el mismo lockfile. Ejecuta `npm ci`, `npx playwright install --with-deps msedge` y `npm run test:e2e` en modo headless. Playwright inicia y espera su propio servidor local en CI; fuera de CI puede reutilizar uno existente. El recorrido comprueba seis pendientes (cuatro vencidos y dos en plazo) en siete anchos de pantalla. Los estados están precargados al corte ficticio y no dependen del día de ejecución. La suite también valida el módulo docente: totales por responsable, filtros, navegación, recarga, estados vacíos/incompletos/error y accesibilidad en escritorio y móvil.
 
@@ -120,4 +120,8 @@ Los ajustes de dependencias transitivas, sus pruebas de compatibilidad y la redu
 
 El refactor visual, las skills locales aplicadas y la instalación de `angular/skills` se documentan en [docs/REFACTOR-UI-SKILLS.md](docs/REFACTOR-UI-SKILLS.md). Incluye mejoras de accesibilidad, tablas móviles, iconografía local y evidencia de que los contratos y dependencias de la demo permanecen intactos.
 
-Próximamente: reportes institucionales definitivos y descarga, formatos reales de insumos, históricos, calidad de información y demás formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, conexión Moodle de solo lectura y publicación pertenecen a otras etapas. La demo no se ha desplegado.
+Próximamente: reportes institucionales definitivos y descarga, formatos reales de insumos, históricos, calidad de información y demás formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, acceso Moodle multicurso y publicación pertenecen a otras etapas. La demo no se ha desplegado.
+
+## Piloto local de lectura Moodle
+
+Sistemas puede consultar las tareas de Fundamentos de Contabilidad 27-1 y abrir el listado de estudiantes de cada indicador. La [guía de arranque y verificación](docs/MOODLE-LECTURA-PILOTO.md) incluye las instrucciones para PowerShell y el alcance de la población.
