@@ -95,27 +95,46 @@
     </div>
     <section class="hero-banner overview" aria-label="Población y avance de calificación">
       <div>
-        <span class="overview-number">{{ data.students.length }}</span
-        ><span>Estudiantes identificados</span>
+        <span class="overview-number">{{ data.identifiedCount }}</span
+        ><span>Estudiantes identificados en el curso</span>
+        @if (data.expectedCount !== null) {
+          <small>Estudiantes a quienes corresponde la actividad: {{ data.expectedCount }}</small>
+        }
       </div>
       <div>
         <span class="overview-number">{{ sent() }}</span
         ><span>Entregas con estado de calificación determinado</span>
       </div>
       <div class="progress-block">
-        <span>Avance de calificación</span
-        ><b>{{ gradedPercent() === null ? 'Sin entregas' : gradedPercent() + '%' }}</b>
-        <div class="track" aria-hidden="true"><i [style.width.%]="gradedPercent() ?? 0"></i></div>
-        <small>{{ groups().calificadas.length }} de {{ sent() }} entregas calificadas</small>
+        <span>Avance de calificación</span>
+        @if (gradedPercent() !== null) {
+          <b>{{ gradedPercent() }}%</b>
+          <div class="track" aria-hidden="true"><i [style.width.%]="gradedPercent()"></i></div>
+          <small>{{ groups().calificadas.length }} de {{ sent() }} entregas calificadas</small>
+        } @else {
+          <b>{{
+            groups().revisar.length || data.expectedCount === null
+              ? 'Avance por confirmar'
+              : 'Sin entregas'
+          }}</b>
+        }
       </div>
     </section>
+    @if (data.expectedCount === null) {
+      <p class="notice info">Población de la actividad por confirmar</p>
+    }
     @if (state(); as status) {
       <section class="panel detail">
         <a mat-button routerLink="." [queryParams]="{ actividad: data.activity.id }"
           ><app-ui-icon name="arrowLeft" /> Volver al resumen</a
         >
-        <h2>{{ labels[status] }} ({{ groups()[status].length }})</h2>
-        @if (!groups()[status].length) {
+        @let missingUnknown = status === 'sin-entrega' && data.expectedCount === null;
+        <h2>
+          {{ labels[status] }} ({{ missingUnknown ? 'No calculable' : groups()[status].length }})
+        </h2>
+        @if (missingUnknown) {
+          <p class="notice neutral">{{ data.scopeReason }}</p>
+        } @else if (!groups()[status].length) {
           <p class="notice neutral">Ningún estudiante en este estado.</p>
         } @else {
           <ul class="records">
@@ -149,7 +168,10 @@
             [queryParams]="{ actividad: data.activity.id, estado: s }"
           >
             <span class="tile"><app-ui-icon [name]="icons[s]" /></span>
-            <strong>{{ groups()[s].length }}</strong
+            @let missingUnknown = s === 'sin-entrega' && data.expectedCount === null;
+            <strong [class.unknown]="missingUnknown">{{
+              missingUnknown ? 'No calculable' : groups()[s].length
+            }}</strong
             ><span class="card-label">{{ labels[s] }}</span
             ><app-ui-icon class="go" name="arrowRight" />
           </a>

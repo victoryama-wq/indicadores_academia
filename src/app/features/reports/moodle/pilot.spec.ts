@@ -22,10 +22,36 @@ describe('Lectura Moodle por actividad', () => {
         return Response.json({
           activity,
           students,
+          identifiedCount: 24,
+          expectedCount: 24,
+          scopeReason: null,
           unidentified: 1,
           readAt: '2026-11-17T16:45:00Z',
         });
-      return Response.json({ course: 'Curso ficticio', activities: [activity, second] });
+      if (url.endsWith('/22043'))
+        return Response.json({
+          activity: { ...activity, id: 22043 },
+          identifiedCount: 24,
+          expectedCount: null,
+          scopeReason: 'Falta el alcance de la sección.',
+          unidentified: 0,
+          students: [{ ...students[0], state: 'revisar' }],
+          readAt: '2026-11-17T16:46:00Z',
+        });
+      if (url.endsWith('/22044'))
+        return Response.json({
+          activity: { ...activity, id: 22044 },
+          identifiedCount: 24,
+          expectedCount: 1,
+          scopeReason: null,
+          unidentified: 0,
+          students: [{ ...students[2], state: 'sin-entrega' }],
+          readAt: '2026-11-17T16:47:00Z',
+        });
+      return Response.json({
+        course: 'Curso ficticio',
+        activities: [activity, second, { ...activity, id: 22043 }, { ...activity, id: 22044 }],
+      });
     });
     vi.stubGlobal('fetch', api);
     TestBed.configureTestingModule({
@@ -49,6 +75,23 @@ describe('Lectura Moodle por actividad', () => {
       expect(root.querySelectorAll('li').length).toBe(n);
     }
     expect(api).toHaveBeenCalledTimes(2);
+    await harness.navigateByUrl('/reportes/moodle?actividad=22043');
+    await harness.fixture.whenStable();
+    expect(root.textContent).toContain('Población de la actividad por confirmar');
+    expect(root.querySelector('.progress-block b')?.textContent).toBe('Avance por confirmar');
+    expect(root.querySelector('.track')).toBeNull();
+    expect(root.textContent).not.toContain('0 de 0');
+    expect(root.querySelector('[data-state="sin-entrega"] strong')?.textContent).toBe(
+      'No calculable',
+    );
+    await harness.navigateByUrl('/reportes/moodle?actividad=22043&estado=sin-entrega');
+    expect(root.querySelector('.detail')?.textContent).toContain('Falta el alcance de la sección.');
+    expect(root.querySelectorAll('li').length).toBe(0);
+    await harness.navigateByUrl('/reportes/moodle?actividad=22044');
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.progress-block b')?.textContent).toBe('Sin entregas');
+    expect(root.querySelector('.track')).toBeNull();
+    expect(root.querySelector('[data-state="sin-entrega"] strong')?.textContent).toBe('1');
     await harness.navigateByUrl('/reportes/moodle?actividad=22042');
     await harness.fixture.whenStable();
     expect(root.querySelector('[role=alert]')?.textContent).toContain('Consulta incompleta');

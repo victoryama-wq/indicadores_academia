@@ -41,6 +41,9 @@ interface Snapshot {
   activity: Activity;
   students: Row[];
   unidentified: number;
+  identifiedCount: number;
+  expectedCount: number | null;
+  scopeReason: string | null;
   readAt: string;
 }
 

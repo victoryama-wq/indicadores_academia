@@ -8,7 +8,7 @@ function list(value) {
   return value;
 }
 
-export function moodleReader(token, request = fetch) {
+export function moodleReader(token, request = fetch, readAudience) {
   async function read(fn, params, emptyWarning) {
     let result;
     try {
@@ -91,10 +91,17 @@ export function moodleReader(token, request = fetch) {
       if (blocks.length !== 1 || blocks[0].assignmentid !== id) throw invalid();
       return list(blocks[0][field]);
     }
+    // El servicio actual no acredita los destinatarios por actividad.
+    const audience = await readAudience?.({ courseId, assignmentId: id, cmid: activity.cmid });
     return {
       course: context.course,
       activity,
-      ...classify(list(users), records(deliveries, 'submissions'), records(marks, 'grades')),
+      ...classify(
+        list(users),
+        records(deliveries, 'submissions'),
+        records(marks, 'grades'),
+        audience,
+      ),
       readAt: new Date().toISOString(),
     };
   }
@@ -118,10 +125,13 @@ function latestByUser(rows) {
   return result;
 }
 
-export function classify(users, submissions, grades) {
+export function classify(users, submissions, grades, audience) {
   const sent = latestByUser(submissions);
   const marks = latestByUser(grades);
-  const students = [];
+  // Solo una fuente que acredite el alcance completo puede suministrar esta población.
+  const courseWide = audience?.kind === 'course';
+  const included = audience?.kind === 'restricted' ? new Set(list(audience.userIds)) : null;
+  const identified = [];
   const ids = new Set(),
     registrations = new Set();
   let unidentified = 0;
@@ -144,6 +154,7 @@ export function classify(users, submissions, grades) {
     registrations.add(registration);
     const submission = sent.get(user.id),
       grade = marks.get(user.id);
+    if (grade && !Object.hasOwn(grade, 'grade')) throw invalid();
     const raw = grade?.grade;
     const value = raw == null || String(raw).trim() === '' ? null : Number(raw);
     if (value !== null && !Number.isFinite(value)) throw invalid();
@@ -153,9 +164,10 @@ export function classify(users, submissions, grades) {
       if (!grade || grade.attemptnumber === submission.attemptnumber)
         state = graded ? 'calificadas' : 'pendientes';
       else if (grade.attemptnumber < submission.attemptnumber) state = 'pendientes';
-    } else if (!graded && (!submission || submission.status === 'new')) state = 'sin-entrega';
+    } else if (!graded && (!submission || submission.status === 'new')) state = null;
     else if (!graded && submission?.status === 'draft') state = 'borradores';
-    students.push({
+    identified.push({
+      userId: user.id,
       registration,
       name: user.fullname || registration,
       state,
@@ -165,10 +177,29 @@ export function classify(users, submissions, grades) {
           : null,
     });
   }
-  if (!students.length && unidentified)
+  if (!ids.size && unidentified)
     throw new Error(
       'Ningún participante tiene una matrícula visible. Verifica los campos autorizados.',
     );
+  let expected = null;
+  if (courseWide) expected = ids;
+  if (included && [...included].every((id) => ids.has(id))) expected = included;
+  const hasConflictingEvidence =
+    expected && identified.some((row) => !expected.has(row.userId) && row.state !== null);
+  if (hasConflictingEvidence) expected = null;
+  const students = identified
+    .filter((row) => row.state !== null || expected?.has(row.userId))
+    .map(({ userId, state, ...row }) => ({ ...row, state: state ?? 'sin-entrega' }));
   students.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  return { students, unidentified };
+  return {
+    students,
+    unidentified,
+    identifiedCount: ids.size,
+    expectedCount: expected?.size ?? null,
+    scopeReason: expected
+      ? null
+      : hasConflictingEvidence
+        ? 'Hay evidencia de actividad fuera de la población indicada.'
+        : 'El servicio de lectura no acredita la lista completa de destinatarios de esta tarea.',
+  };
 }

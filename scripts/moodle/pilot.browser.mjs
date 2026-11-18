@@ -6,7 +6,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { pilotServer } from './pilot.mjs';
 import { classify } from './reader.mjs';
 
-const activities = [22041, 22042, 22043].map((id, i) => ({
+const activities = [22041, 22042, 22043, 22044, 22045, 22046].map((id, i) => ({
   id,
   cmid: 53765 + 3 * i,
   name: 'Unidad ' + (i + 1),
@@ -28,11 +28,23 @@ const reader = {
   snapshot: async (id) => {
     reads++;
     if (id === activities[1].id) throw new Error('Consulta incompleta en datos ficticios.');
+    let result;
+    if (id === activities[2].id) result = classify(users, [], [], { kind: 'course' });
+    else if (id === activities[3].id) {
+      result = classify(users, submissions.slice(0, 1), [], {
+        kind: 'restricted',
+        userIds: [1, 2],
+      });
+    } else if (id === activities[4].id) result = classify(users, submissions.slice(0, 1), []);
+    else if (id === activities[5].id)
+      result = classify(users, [], grades.slice(0, 1), { kind: 'course' });
+    else
+      result = classify(users, submissions, grades, reads === 1 ? { kind: 'course' } : undefined);
     return {
       course,
       activity: activities.find((a) => a.id === id),
       readAt: new Date(Date.UTC(2026, 10, 17, 16, 45, reads)).toISOString(),
-      ...(id === activities[2].id ? classify(users, [], []) : classify(users, submissions, grades)),
+      ...result,
     };
   },
 };
@@ -69,7 +81,10 @@ try {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.locator('.state-card')).toHaveCount(5);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    await page.screenshot({ path: 'test-results/moodle-ui/resumen-' + width + '.png', fullPage: true });
+    await page.screenshot({
+      path: 'test-results/moodle-ui/resumen-' + width + '.png',
+      fullPage: true,
+    });
   }
   assert.deepEqual(
     (await new AxeBuilder({ page }).analyze()).violations.map((v) => [
@@ -114,6 +129,31 @@ try {
   await page.getByRole('button', { name: 'Actualizar lectura' }).click();
   await expect(cut).toContainText('11:45:02');
   assert.equal(reads, 2);
+  const cards = page.locator('.state-card strong');
+  await expect(cards).toHaveText(['18', '2', 'No calculable', '0', '0']);
+  await page.locator('[data-state=sin-entrega]').click();
+  await expect(page.locator('.detail')).toContainText('No calculable');
+  await expect(page.locator('.detail li')).toHaveCount(0);
+  await expect(cut).toContainText('11:45:02');
+  const select = page.getByLabel('Actividad', { exact: true });
+  await select.selectOption('22044');
+  await expect(cards).toHaveText(['0', '1', '1', '0', '0']);
+  await expect(page.locator('.overview')).toContainText(
+    'Estudiantes a quienes corresponde la actividad: 2',
+  );
+  await page.locator('[data-state=sin-entrega]').click();
+  await expect(page.locator('.detail li')).toHaveCount(1);
+  await expect(page.locator('.detail li')).toContainText('TUP0002');
+  await select.selectOption('22045');
+  await expect(cards).toHaveText(['0', '1', 'No calculable', '0', '0']);
+  await page.locator('[data-state=sin-entrega]').click();
+  await expect(page.locator('.detail')).toContainText('no acredita la lista completa');
+  await expect(page.locator('.detail li')).toHaveCount(0);
+  await select.selectOption('22046');
+  await expect(page.locator('.progress-block b')).toHaveText('Avance por confirmar');
+  await expect(page.locator('.track')).toHaveCount(0);
+  await expect(page.locator('.progress-block')).not.toContainText('0 de 0');
+  await expect(page.locator('[data-state=revisar] strong')).toHaveText('1');
   await page.getByLabel('Actividad', { exact: true }).selectOption('22043');
   await expect(page.locator('.progress-block b')).toHaveText('Sin entregas');
   await page.getByLabel('Actividad', { exact: true }).selectOption('22042');
