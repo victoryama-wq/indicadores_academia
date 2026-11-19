@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { UiIcon, type UiIconName } from '../../../shared/ui-icon/ui-icon';
 import { MatButtonModule } from '@angular/material/button';
+import { moodleDelay } from './moodle-delay';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -32,6 +33,7 @@ interface Catalog {
 }
 interface Row {
   registration: string;
+  dueDate?: number | null;
   name: string;
   state: State;
   updatedAt: string | null;
@@ -164,6 +166,7 @@ export class MoodlePilot {
     revisar: 'info',
   };
   readonly labels = states;
+  readonly moodleDelay = moodleDelay;
   readonly keys = Object.keys(states) as State[];
   readonly groups = computed(() => {
     const rows = this.snapshot.hasValue() ? this.snapshot.value().students : [];

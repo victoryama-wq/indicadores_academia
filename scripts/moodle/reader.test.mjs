@@ -58,6 +58,7 @@ function api(overrides = {}, readAudience) {
   const responses = {
     core_webservice_get_site_info: site,
     mod_assign_list_participants: rows,
+    mod_assign_get_participant: { exception: 'denied' },
     mod_assign_get_assignments: catalog,
     core_enrol_get_enrolled_users: users,
     mod_assign_get_submissions: wrap('submissions', submissions),
@@ -72,11 +73,119 @@ function api(overrides = {}, readAudience) {
     const fn = options.body.get('wsfunction');
     assert.ok(Object.hasOwn(responses, fn));
     calls.push([fn, Object.fromEntries(options.body)]);
-    return Response.json(responses[fn]);
+    const response = responses[fn];
+    return Response.json(typeof response === 'function' ? response(options.body) : response);
   };
   const reader = moodleReader('ficticio', request, readAudience ? () => readAudience() : undefined);
   return { reader, calls, request };
 }
+
+test('Las fechas solo enriquecen sin entrega: normal, prórroga vigente, ajuste de grupo y sin fecha', async (t) => {
+  const cut = new Date('2026-11-17T16:45:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: cut });
+  const due = cut.getTime() / 1000 - 3600;
+  const groupDue = due + 86400;
+  const extension = due + 7200;
+  const fixture = api(
+    {
+      mod_assign_list_participants: rows.map((r) => ({ ...r, grantedextension: r.id === 22 })),
+      mod_assign_get_participant: (params) => {
+        assert.equal(params.get('assignid'), String(id));
+        const user = Number(params.get('userid'));
+        // Moodle ya resolvió el override del grupo del estudiante 23.
+        return {
+          ...visible(user),
+          duedate: { 21: due, 23: groupDue, 24: 0 }[user],
+          grantedextension: false,
+          cutoffdate: due + 100000,
+        };
+      },
+      mod_assign_get_user_flags: wrap('userflags', [{ userid: 22, extensionduedate: extension }]),
+    },
+    evidence,
+  );
+  const snap = await fixture.reader.snapshot(id);
+  assert.equal(snap.readAt, cut.toISOString());
+  assert.deepEqual(
+    snap.students.filter((r) => r.state === 'sin-entrega').map((r) => r.dueDate),
+    [due, extension, groupDue, 0],
+  );
+  assert.deepEqual(
+    fixture.calls.filter(([fn]) => fn === 'mod_assign_get_participant').map(([, p]) => +p.userid),
+    [21, 23, 24],
+  );
+  assert.equal(fixture.calls.filter(([fn]) => fn === 'mod_assign_get_user_flags').length, 1);
+  assert.equal(snap.students.filter((r) => r.state === 'calificadas').length, 18);
+  assert.equal(snap.students.filter((r) => r.state === 'pendientes').length, 2);
+});
+
+test('Una consulta de prórrogas denegada mantiene al estudiante sin entrega y su atraso por confirmar', async () => {
+  const due = 1794931200;
+  const fixture = api(
+    {
+      mod_assign_get_participant: (params) => {
+        const user = Number(params.get('userid'));
+        return { ...visible(user), grantedextension: user === 22, duedate: due };
+      },
+      mod_assign_get_user_flags: {
+        exception: 'webservice_access_exception',
+        errorcode: 'nopermissions',
+      },
+    },
+    evidence,
+  );
+  const snap = await fixture.reader.snapshot(id);
+  assert.deepEqual(
+    snap.students
+      .filter((row) => row.state === 'sin-entrega')
+      .map((row) => [row.registration, row.dueDate]),
+    [
+      ['TUP0021', due],
+      ['TUP0022', null],
+      ['TUP0023', due],
+      ['TUP0024', due],
+    ],
+  );
+  assert.equal(fixture.calls.filter(([fn]) => fn === 'mod_assign_get_user_flags').length, 1);
+});
+
+test('Permiso denegado, ID ajeno, prórroga sin fecha y campos ausentes conservan las filas', async () => {
+  const snap = await api(
+    {
+      mod_assign_get_participant: (params) => {
+        const user = +params.get('userid');
+        if (user === 21) return { exception: 'denied' };
+        if (user === 22) return { ...visible(5), grantedextension: false, duedate: 12 };
+        if (user === 23) return { ...visible(user), grantedextension: true, duedate: 12 };
+        return { ...visible(user), grantedextension: false, gradingduedate: 100, cutoffdate: 300 };
+      },
+      mod_assign_get_user_flags: wrap('userflags', [{ userid: 21, extensionduedate: 90 }]),
+    },
+    evidence,
+  ).reader.snapshot(id);
+  assert.deepEqual(
+    snap.students.filter((r) => r.state === 'sin-entrega').map((r) => r.dueDate),
+    [null, null, null, null],
+  );
+});
+
+test('El diagnóstico separa la muestra visible del cotejo y respeta funciones ausentes', async () => {
+  const fixture = api({ core_webservice_get_site_info: { ...site, functions: [] } });
+  const result = await fixture.reader.probeDueDates(id);
+  assert.match(result.mode, /sin cotejo vigente/);
+  assert.equal(result.assessed, 1);
+  assert.equal(result.confirmed, 0);
+  assert.deepEqual(
+    result.functions.map(([, status]) => status),
+    ['no', 'no'],
+  );
+  assert.ok(
+    !fixture.calls.some(([fn]) =>
+      ['mod_assign_get_participant', 'mod_assign_get_user_flags'].includes(fn),
+    ),
+  );
+  assert.equal(JSON.stringify(result).includes('TUP'), false);
+});
 
 test('Un cotejo de curso completo usa el padrón activo y verifica cada identidad y estado de la tarea', async () => {
   const until = new Date(Date.now() + 60000).toISOString();

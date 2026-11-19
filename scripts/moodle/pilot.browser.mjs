@@ -40,10 +40,16 @@ const reader = {
       result = classify(users, [], grades.slice(0, 1), { kind: 'course' });
     else
       result = classify(users, submissions, grades, reads === 1 ? { kind: 'course' } : undefined);
+    const readAt = new Date(Date.UTC(2026, 10, 17, 16, 45, reads));
+    const cutSeconds = readAt.getTime() / 1000;
+    const sampleDates = [cutSeconds - 11220, cutSeconds + 86400, 0, null];
+    for (const row of result.students.filter((r) => r.state === 'sin-entrega')) {
+      row.dueDate = sampleDates.shift() ?? null;
+    }
     return {
       course,
       activity: activities.find((a) => a.id === id),
-      readAt: new Date(Date.UTC(2026, 10, 17, 16, 45, reads)).toISOString(),
+      readAt: readAt.toISOString(),
       ...result,
     };
   },
@@ -120,6 +126,21 @@ try {
     'TUP0023',
     'TUP0024',
   ]);
+  const labels = [
+    '3 horas 7 minutos de atraso',
+    'En plazo',
+    'Sin fecha de entrega',
+    'Atraso por confirmar',
+  ];
+  await expect(page.getByRole('heading', { name: 'Atraso según Moodle' })).toBeVisible();
+  await expect(page.locator('.records .row-date b')).toHaveText(labels);
+  await expect(page.locator('.records .row-date').first()).toContainText('17/11/2026 08:38:01');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.getByRole('link', { name: 'Volver al resumen' }).click();
+  await page.getByRole('link', { name: /Sin entrega/ }).click();
+  await expect(cut).toHaveText(initialCut);
+  await expect(page.locator('.records .row-date b')).toHaveText(labels);
+  assert.equal(reads, 1);
   await page.getByRole('link', { name: 'Volver al resumen' }).click();
   await page.getByRole('link', { name: /Entregas pendientes de calificar/ }).click();
   await expect(

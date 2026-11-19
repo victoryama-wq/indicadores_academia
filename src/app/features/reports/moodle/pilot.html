@@ -152,6 +152,10 @@
         } @else if (!groups()[status].length) {
           <p class="notice neutral">Ningún estudiante en este estado.</p>
         } @else {
+          @if (status === 'sin-entrega') {
+            <h3>Atraso según Moodle</h3>
+            <p>Fecha efectiva de entrega en horario de Cancún y atraso al corte de esta lectura.</p>
+          }
           <ul class="records">
             @for (row of groups()[status]; track row.registration) {
               <li>
@@ -160,7 +164,15 @@
                   <strong>{{ row.name }}</strong
                   ><small>{{ row.registration }}</small>
                 </div>
-                @if (row.updatedAt) {
+                @if (status === 'sin-entrega') {
+                  <span class="row-date">
+                    <b>{{ moodleDelay(row.dueDate, data.readAt) }}</b>
+                    @if (row.dueDate) {
+                      <br />Entrega:
+                      {{ row.dueDate * 1000 | date: 'dd/MM/yyyy HH:mm:ss' : '-0500' }}
+                    }
+                  </span>
+                } @else if (row.updatedAt) {
                   <small class="row-date"
                     >Última modificación de la entrega<br />{{
                       row.updatedAt | date: 'dd/MM/yyyy HH:mm' : '-0500'
