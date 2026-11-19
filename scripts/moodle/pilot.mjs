@@ -100,7 +100,29 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
       : undefined,
   );
   const probe = process.argv.indexOf('--comprobar-participantes');
-  if (probe !== -1) {
+  const dateProbe = process.argv.indexOf('--comprobar-fechas');
+  if (dateProbe !== -1) {
+    try {
+      const user = process.argv[dateProbe + 2];
+      const result = await reader.probeDueDates(
+        Number(process.argv[dateProbe + 1]),
+        user ? Number(user) : undefined,
+      );
+      for (const [name, status] of result.functions)
+        console.log('Función', name, '| anunciada:', status);
+      console.log(
+        'Diagnóstico de fechas:',
+        result.mode,
+        '| filas evaluadas:',
+        result.assessed,
+        '| fechas determinadas (incluye sin fecha):',
+        result.confirmed,
+      );
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+    }
+  } else if (probe !== -1) {
     const assignmentId = Number(process.argv[probe + 1]);
     let site;
     try {

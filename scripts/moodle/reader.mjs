@@ -1,3 +1,5 @@
+import { effectiveDueDates } from './due-dates.mjs';
+
 const endpoint = 'https://moodle2.tecplayacar.edu.mx/webservice/rest/server.php';
 const courseId = 4455;
 const invalid = () =>
@@ -127,8 +129,9 @@ export function moodleReader(token, request = fetch, readAudience) {
     const submissions = records(deliveries, 'submissions');
     const academicUsers = list(users).filter((user) => user.id !== site.userid);
     let audience;
+    let rows;
     try {
-      const rows = await participants(id);
+      rows = await participants(id);
       const activeUserIds = academicUsers.filter(registrationOf).map((u) => u.id);
       const evidence = await readAudience?.({
         courseId,
@@ -142,14 +145,88 @@ export function moodleReader(token, request = fetch, readAudience) {
         reason: 'No se pudo verificar la tabla de participantes de la tarea o su cotejo local.',
       };
     }
+    const result = classify(academicUsers, submissions, records(marks, 'grades'), audience);
+    const missing = result.students.filter((row) => row.state === 'sin-entrega');
+    if (missing.length) {
+      const ids = new Map(academicUsers.map((u) => [registrationOf(u), u.id]));
+      const missingIds = new Set(missing.map((row) => ids.get(row.registration)));
+      const dates = await effectiveDueDates(
+        read,
+        id,
+        rows.filter((row) => missingIds.has(row.id)),
+        site.functions,
+      );
+      for (const row of missing) row.dueDate = dates.get(ids.get(row.registration)) ?? null;
+    }
     return {
       course: context.course,
       activity,
-      ...classify(academicUsers, submissions, records(marks, 'grades'), audience),
+      ...result,
       readAt: new Date().toISOString(),
     };
   }
-  return { catalog, snapshot, siteInfo, participants };
+  async function probeDueDates(id, userId) {
+    const site = await siteInfo();
+    const activity = (await catalog()).activities.find((a) => a.id === id && a.supported);
+    if (!activity) throw new Error('Selecciona una tarea individual del catálogo del piloto.');
+    const functions = ['mod_assign_get_participant', 'mod_assign_get_user_flags'].map((name) => [
+      name,
+      Array.isArray(site.functions)
+        ? site.functions.some((fn) => fn.name === name)
+          ? 'sí'
+          : 'no'
+        : 'sin información',
+    ]);
+    if (userId === undefined) {
+      const result = await snapshot(id);
+      const missing = result.students.filter((row) => row.state === 'sin-entrega');
+      if (result.expectedCount !== null)
+        return {
+          functions,
+          mode: 'cotejo vigente',
+          assessed: missing.length,
+          confirmed: missing.filter((row) => row.dueDate !== null).length,
+        };
+      const sample = list(await participants(id)).find(
+        (r) =>
+          r.id !== site.userid &&
+          Number.isSafeInteger(r.id) &&
+          r.id > 0 &&
+          [false, 0].includes(r.submitted) &&
+          ['', 'new'].includes(r.submissionstatus),
+      );
+      if (!sample)
+        return {
+          functions,
+          mode: 'sin cotejo vigente ni fila de prueba',
+          assessed: 0,
+          confirmed: 0,
+        };
+      const dates = await effectiveDueDates(read, id, [sample], site.functions);
+      return {
+        functions,
+        mode: 'muestra técnica de una fila visible; población sin cotejo vigente',
+        assessed: 1,
+        confirmed: dates.get(sample.id) != null ? 1 : 0,
+      };
+    }
+    if (!Number.isSafeInteger(userId) || userId <= 0 || userId === site.userid) throw invalid();
+    const row = list(await participants(id)).find(
+      (r) =>
+        r.id === userId &&
+        [false, 0].includes(r.submitted) &&
+        ['', 'new'].includes(r.submissionstatus),
+    );
+    if (!row) throw new Error('La fila indicada no figura con estado vacío o nuevo en la tarea.');
+    const dates = await effectiveDueDates(read, id, [row], site.functions);
+    return {
+      functions,
+      mode: 'fila indicada por Sistemas',
+      assessed: 1,
+      confirmed: dates.get(userId) != null ? 1 : 0,
+    };
+  }
+  return { catalog, snapshot, siteInfo, participants, probeDueDates };
 }
 
 function latestByUser(rows) {

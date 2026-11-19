@@ -1,10 +1,27 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { moodleDelay } from './moodle-delay';
 import { MoodlePilot } from './pilot';
 
 describe('Lectura Moodle por actividad', () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it('mide hasta el segundo del corte con las dos unidades adyacentes de Moodle', () => {
+    const cut = '2026-11-17T16:45:00.500Z';
+    const now = Math.floor(Date.parse(cut) / 1000);
+    for (const [value, label] of [
+      [now - 73, '1 minuto 13 segundos de atraso'],
+      [now - 11220, '3 horas 7 minutos de atraso'],
+      [now - 86460, '1 día de atraso'],
+      [now - 1, '1 segundo de atraso'],
+      [now, 'En plazo'],
+      [now + 3600, 'En plazo'],
+      [0, 'Sin fecha de entrega'],
+      [null, 'Atraso por confirmar'],
+    ] as const)
+      expect(moodleDelay(value, cut)).toBe(label);
+  });
 
   it('abre el detalle con el mismo corte y descarta las cifras si falla una consulta nueva', async () => {
     const activity = { id: 22041, cmid: 53765, name: 'Unidad 1', supported: true };
