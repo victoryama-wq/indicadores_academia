@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { moodleDelay } from './moodle-delay';
+import { MoodleLinks } from '../../../core/reporting/moodle-links';
 import { MoodlePilot } from './pilot';
 
 describe('Lectura Moodle por actividad', () => {
@@ -33,6 +34,10 @@ describe('Lectura Moodle por actividad', () => {
       updatedAt: null,
     }));
     const api = vi.fn(async (url: string) => {
+      if (url === '/api/links')
+        return Response.json([
+          { row: 0, courseId: 4455, status: 'linked', fullname: 'Curso ficticio' },
+        ]);
       if (url.endsWith('/22042'))
         return Response.json({ error: 'Consulta incompleta.' }, { status: 502 });
       if (url.endsWith('/22041'))
@@ -72,10 +77,19 @@ describe('Lectura Moodle por actividad', () => {
     });
     vi.stubGlobal('fetch', api);
     TestBed.configureTestingModule({
-      providers: [provideRouter([{ path: 'reportes/moodle', component: MoodlePilot }])],
+      providers: [
+        {
+          provide: MoodleLinks,
+          useValue: { result: () => ({ version: 1, links: [] }), path: () => '/api/links' },
+        },
+        provideRouter([{ path: 'reportes/moodle', component: MoodlePilot }]),
+      ],
     });
     const harness = await RouterTestingHarness.create();
-    const page = await harness.navigateByUrl('/reportes/moodle', MoodlePilot);
+    const page = await harness.navigateByUrl(
+      '/reportes/moodle?periodo=p01&curso=4455',
+      MoodlePilot,
+    );
     const root = harness.routeNativeElement!;
     expect(root.textContent).toContain('Clave local del piloto');
     expect(api).not.toHaveBeenCalled();
@@ -88,7 +102,9 @@ describe('Lectura Moodle por actividad', () => {
       ['pendientes', 2],
       ['sin-entrega', 4],
     ] as const) {
-      await harness.navigateByUrl('/reportes/moodle?actividad=22041&estado=' + state);
+      await harness.navigateByUrl(
+        '/reportes/moodle?periodo=p01&curso=4455&actividad=22041&estado=' + state,
+      );
       expect(root.querySelectorAll('li').length).toBe(n);
       if (state === 'sin-entrega') {
         expect(
@@ -96,8 +112,8 @@ describe('Lectura Moodle por actividad', () => {
         ).toEqual(['TUP0021', 'TUP0022', 'TUP0023', 'TUP0024']);
       }
     }
-    expect(api).toHaveBeenCalledTimes(2);
-    await harness.navigateByUrl('/reportes/moodle?actividad=22043');
+    expect(api).toHaveBeenCalledTimes(3);
+    await harness.navigateByUrl('/reportes/moodle?periodo=p01&curso=4455&actividad=22043');
     await harness.fixture.whenStable();
     expect(root.textContent).toContain('Población de la actividad por confirmar');
     expect(root.querySelector('.progress-block b')?.textContent).toBe('Avance por confirmar');
@@ -106,15 +122,17 @@ describe('Lectura Moodle por actividad', () => {
     expect(root.querySelector('[data-state="sin-entrega"] strong')?.textContent).toBe(
       'No calculable',
     );
-    await harness.navigateByUrl('/reportes/moodle?actividad=22043&estado=sin-entrega');
+    await harness.navigateByUrl(
+      '/reportes/moodle?periodo=p01&curso=4455&actividad=22043&estado=sin-entrega',
+    );
     expect(root.querySelector('.detail')?.textContent).toContain('Falta el alcance de la sección.');
     expect(root.querySelectorAll('li').length).toBe(0);
-    await harness.navigateByUrl('/reportes/moodle?actividad=22044');
+    await harness.navigateByUrl('/reportes/moodle?periodo=p01&curso=4455&actividad=22044');
     await harness.fixture.whenStable();
     expect(root.querySelector('.progress-block b')?.textContent).toBe('Sin entregas');
     expect(root.querySelector('.track')).toBeNull();
     expect(root.querySelector('[data-state="sin-entrega"] strong')?.textContent).toBe('1');
-    await harness.navigateByUrl('/reportes/moodle?actividad=22042');
+    await harness.navigateByUrl('/reportes/moodle?periodo=p01&curso=4455&actividad=22042');
     await harness.fixture.whenStable();
     expect(root.querySelector('[role=alert]')?.textContent).toContain('Consulta incompleta');
     expect(root.querySelector('.overview')).toBeNull();

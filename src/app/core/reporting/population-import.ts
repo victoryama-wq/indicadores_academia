@@ -88,6 +88,13 @@ export function validatePopulation(
     if (r['fila'] !== fila) reject('Falta el número de fila de origen.');
     if (!saeko && typeof r['celdaNumerica'] !== 'boolean')
       reject('Falta el tipo de celda de matrícula.');
+    if (!saeko) {
+      for (const key of ['modalidad', 'docente']) {
+        const value = r[key];
+        if (value !== undefined && (typeof value !== 'string' || value.length > 4000))
+          reject('Campo inválido: ' + key);
+      }
+    }
     if (result.errors.length !== before) continue;
     const val = (k: string) => r[k] as string;
     const source = { hoja, fila, cicloOrigen: val('cicloOrigen') };
@@ -129,6 +136,8 @@ export function validatePopulation(
         carrera: val('carrera'),
         grupo: group,
         comparte: val('comparte'),
+        modalidad: val('modalidad') ?? '',
+        docente: val('docente') ?? '',
         matriculas: val('matriculas'),
         celdaNumerica: r['celdaNumerica'] === true,
       };
@@ -136,6 +145,8 @@ export function validatePopulation(
         fold(row.numero).replace(/\.$/, ''),
         fold(row.materia),
         canonical(group),
+        fold(row.modalidad),
+        fold(row.docente),
       ]);
       resumen = `${row.numero} ${row.materia} · ${group}`;
       courses.push(row);
@@ -203,7 +214,8 @@ export function parsePopulationSheets(sheets: Sheet[], type: Kind, cycle: string
     return result;
   }
   const [{ s, index, labels }] = matches;
-  if (Object.values(columns).some((k) => labels.indexOf(k) !== labels.lastIndexOf(k))) {
+  const recognized = [...Object.values(columns), ...(saeko ? [] : ['DOCENTE', 'MODALIDAD'])];
+  if (recognized.some((k) => labels.indexOf(k) !== labels.lastIndexOf(k))) {
     result.errors.push({ hoja: s.sheet, fila: index + 1, motivo: 'Encabezado duplicado.' });
     return result;
   }
@@ -227,6 +239,12 @@ export function parsePopulationSheets(sheets: Sheet[], type: Kind, cycle: string
               : (v ?? '');
     }
     if (!saeko) {
+      for (const [key, label] of [
+        ['docente', 'DOCENTE'],
+        ['modalidad', 'MODALIDAD'],
+      ]) {
+        row[key] = r[labels.indexOf(label)] ?? '';
+      }
       const value = r[labels.indexOf(courseColumns.matriculas)];
       row['celdaNumerica'] = value instanceof XlsxNumber || typeof value === 'number';
     }

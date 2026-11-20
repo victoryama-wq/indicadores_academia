@@ -1,6 +1,6 @@
 # Piloto local de lectura Moodle
 
-Sistemas puede consultar las actividades individuales del curso **4455 · 603. Fundamentos de Contabilidad 27-1**. La primera actividad seleccionada es la Unidad 1 (módulo 53765, tarea 22041). El selector obtiene las demás tareas de Moodle y conserva sus identificadores. Una discrepancia de curso o ciclo detiene la lectura. El catálogo institucional multicurso y el acceso de Coordinación y Dirección requieren una fase posterior.
+Sistemas vincula las imparticiones activas de SPAI con el catálogo de cursos visible para la cuenta técnica. Abre una asignatura vinculada para consultar sus actividades individuales. El ID interno se obtiene de Moodle en cada vinculación.
 
 ## Arranque en Windows
 
@@ -12,7 +12,18 @@ npm run build
 [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\pilot.mjs --token-stdin
 ```
 
-Abre **http://127.0.0.1:4380/reportes** en el mismo equipo, selecciona el perfil simulado **Sistemas** y pulsa **Abrir piloto local de lectura Moodle**. El perfil muestra el enlace, pero no concede acceso institucional. Introduce la **clave local** impresa en la terminal. Para detenerlo pulsa Ctrl+C. El token se introduce en el indicador oculto de PowerShell. La clave del navegador cambia al reiniciar el servidor. El piloto conserva las filas en memoria mientras se consulta la pantalla. Cerrar la consulta o recargar la página vuelve a pedir la clave.
+Abre **http://127.0.0.1:4380/reportes**, selecciona **Sistemas** y ve a **Administración → Insumos por ciclo**. El perfil muestra el enlace, pero no concede acceso institucional. Introduce la **clave local** impresa en la terminal. Para detenerlo pulsa Ctrl+C. El token se introduce en el indicador oculto de PowerShell. La clave del navegador cambia al reiniciar el servidor. El piloto conserva las filas en memoria mientras se consulta la pantalla. Cerrar la consulta o recargar la página vuelve a pedir la clave.
+
+## Vinculación SPAI y cotejo de dos asignaturas
+
+1. Desde **Insumos por ciclo** en el puerto 4380 selecciona 27-1. Carga el XLSX de asignaciones SPAI o su plantilla JSON. La plantilla de inscripciones contiene estudiantes por curso. Para obtener vínculos Moodle, usa la exportación de asignaciones con número, materia y grupo base. La vista previa valida las filas en la pestaña. Conserva grupo base, «Comparte con», modalidad y docente. Las columnas XLSX opcionales son `Modalidad` y `Docente`. Si faltan, se muestran como «Sin informar». Una carga inválida conserva la versión activa y sus vínculos.
+2. Introduce la clave local y activa la versión válida. Node busca el ciclo en el catálogo visible mediante `core_course_search_courses`. Usa búsqueda por texto con el ciclo y comprueba que el total devuelto coincide con los cursos recibidos. La búsqueda requiere que el servicio de lectura pueda invocar esa función. Un error del servicio se muestra como búsqueda no completada y permite reintentar. [Contrato de búsqueda de Moodle 4.5.5](https://github.com/moodle/moodle/blob/v4.5.5/course/externallib.php#L2480-L2547)
+3. Revisa los tres totales y las filas. La coincidencia exige número completo al inicio, materia completa y ciclo al final del nombre. Se normalizan acentos, mayúsculas y espacios. Si SPAI antepone una clave académica como `DEM01 - `, se comprueba también el título sin esa clave. Si las dos variantes apuntan a cursos distintos, la fila queda por revisar. Se conserva la distinción de los ceros del número. Una impartición con grupos compartidos cuenta una vez. ING e ING-FCS se excluyen según el criterio del cruce SPAI. Dos cursos candidatos o dos imparticiones que reclaman un curso pasan a **Por revisar**. Sistemas puede cotejar la hoja y fila indicadas, corregir el insumo y reactivarlo.
+4. Para **603. Fundamentos de Contabilidad 27-1**, compara el ID de la fila vinculada con el parámetro `id` de la página del curso en Moodle (referencia histórica: 4455). Abre la asignatura e introduce la clave del piloto. El selector lee las tareas del curso. Para cotejar Unidad 1, verifica módulo 53765 y tarea 22041. **Actualizar lectura** vuelve a consultar la asignatura y el corte.
+5. Repite con una segunda impartición autorizada de tu archivo. Comprueba su título, ciclo, ID de curso y una tarea en Moodle. Si el curso se localizó pero faltan permisos, la lectura muestra **Curso localizado · acceso a entregas pendiente**. Cambia a 27-2 y verifica que solo aparecen los vínculos del ciclo elegido. Registra únicamente resultados agregados del cotejo.
+6. Las versiones SPAI y el resumen de vínculos se conservan en `sessionStorage` de la pestaña del piloto. El servidor local verifica cada consulta contra su tabla en memoria de pestaña, ciclo y versión. Tras reiniciar Node, usa **Volver a vincular versión vigente** en la misma pestaña. Los archivos, grupos, docentes y matrículas de SPAI permanecen en el navegador. El catálogo se consulta con el token del proceso Node. Las entregas y notas se solicitan solo al abrir o actualizar la asignatura o seleccionar otra actividad.
+
+Si `mod_assign_get_assignments` devuelve el curso y avisos de módulo con código `1`, Moodle omitió actividades al comprobar su contexto y el permiso `mod/assign:view`. El piloto ofrece las tareas que Moodle sí devolvió. Cuando todas quedaron fuera, Sistemas debe comprobar los permisos efectivos de la cuenta técnica en la actividad y la visibilidad de su sección. Tras un ajuste autorizado, **Reintentar consulta** vuelve a leer el mismo curso. [Comprobación por módulo en Moodle 4.5.5](https://github.com/moodle/moodle/blob/v4.5.5/mod/assign/externallib.php#L372-L388)
 
 ## Comprobación funcional
 
@@ -37,7 +48,7 @@ El avance divide las calificadas entre las calificadas más las pendientes del i
 1. Desde la raíz del proyecto, prueba el servicio con el token de la cuenta técnica. Este comando de PowerShell consulta la versión instalada, el catálogo y los participantes visibles. Imprime identificadores de actividad y conteos agregados. Puede ejecutarse mientras el servidor anterior sigue abierto.
 
    ```powershell
-   [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\pilot.mjs --token-stdin --comprobar-participantes 22041
+   [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\pilot.mjs --token-stdin --comprobar-participantes 22041 --curso 4455
    ```
 
    Si el servicio deniega `mod_assign_list_participants`, el administrador de Moodle puede revisar en **Administración del sitio → Servidor → Servicios web → Servicios externos** si el servicio del token incluye esa función de lectura. Verifica además que la cuenta técnica pueda ver la tabla de calificación de esa tarea y los grupos necesarios. Repite el mismo comando tras cualquier decisión de Sistemas. `core_webservice_get_site_info` aporta el ID de la cuenta del token y el build con los que se vincula el cotejo.
@@ -47,7 +58,7 @@ El avance divide las calificadas entre las calificadas más las pendientes del i
    **Cuando Sistemas ha comprobado que la tarea corresponde a todo el curso**, se puede preparar el cotejo automáticamente. Desde PowerShell en esta carpeta, el siguiente comando pide el ID de tarea, el total académico comprobado independientemente y el límite de vigencia. Se usa la fecha y zona que indique el operador. Node cruza cada ID activo con los participantes y el estado de su último envío, excluye la cuenta técnica y solo guarda el archivo si la comprobación completa pasa.
 
    ```powershell
-   $tarea = Read-Host 'ID de tarea'; $total = Read-Host 'Estudiantes activos que deben entregar'; $hasta = Read-Host 'Vigente hasta (ISO con zona)'; [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\cotejar-curso.mjs $tarea $total $hasta
+   $tarea = Read-Host 'ID de tarea'; $total = Read-Host 'Estudiantes activos que deben entregar'; $hasta = Read-Host 'Vigente hasta (ISO con zona)'; [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\cotejar-curso.mjs $tarea $total $hasta (Read-Host 'ID del curso Moodle')
    ```
 
    El archivo se guarda en `%LOCALAPPDATA%\cotejo-moodle.json` por defecto. Con el servidor actualizado, pulsa **Actualizar lectura** y abre **Sin entrega**. Cada actualización comprueba que el padrón activo conserve las identidades cotejadas para todo el curso. Si cambia la matrícula, cambia la asignación o vence la vigencia, revisa el alcance antes de renovarlo. Para una tarea dirigida a un subconjunto del curso, utiliza el cotejo específico del paso 3.
@@ -85,10 +96,10 @@ La referencia es la **tabla de calificación de la tarea** en Moodle 4.5.5. Esa 
 1. Desde la raíz de esta copia, ejecuta en PowerShell el diagnóstico independiente del servidor. Comprueba qué funciones anuncia el token y cuántas filas tienen una respuesta de fecha determinada (incluido el cero explícito). Si el cotejo ya venció, el diagnóstico puede probar una fila visible de la tabla y la identifica como muestra técnica. Esa muestra no actualiza ni acredita la población académica.
 
    ```powershell
-   [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\pilot.mjs --token-stdin --comprobar-fechas 22041
+   [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\pilot.mjs --token-stdin --comprobar-fechas 22041 --curso 4455
    ```
 
-   Para comprobar una prórroga concreta, añade al final el ID Moodle de esa persona, obtenido localmente de su perfil. El comando imprime solo disponibilidad y conteos. `mod_assign_get_participant` aporta `duedate` con los ajustes del usuario/grupo y señala la existencia de una prórroga. `mod_assign_get_user_flags` aporta `extensionduedate` para la tarea y el usuario cuando Moodle indica una prórroga. Una función anunciada puede tener alcance insuficiente para una fila. [Contrato de participante](https://github.com/moodle/moodle/blob/v4.5.5/mod/assign/externallib.php#L2856-L2908) · [Prórrogas](https://github.com/moodle/moodle/blob/v4.5.5/mod/assign/externallib.php#L1082-L1154)
+   Para comprobar una prórroga concreta, coloca entre el ID de tarea y `--curso` el ID Moodle de esa persona, obtenido localmente de su perfil. El comando imprime solo disponibilidad y conteos. `mod_assign_get_participant` aporta `duedate` con los ajustes del usuario/grupo y señala la existencia de una prórroga. `mod_assign_get_user_flags` aporta `extensionduedate` para la tarea y el usuario cuando Moodle indica una prórroga. Una función anunciada puede tener alcance insuficiente para una fila. [Contrato de participante](https://github.com/moodle/moodle/blob/v4.5.5/mod/assign/externallib.php#L2856-L2908) · [Prórrogas](https://github.com/moodle/moodle/blob/v4.5.5/mod/assign/externallib.php#L1082-L1154)
 
 2. Comprueba que el cotejo de población esté vigente para la tarea seleccionada. El diagnóstico se puede usar durante una presentación. Para revisar la interfaz institucional, utiliza el servidor de **esta copia** cuando el puerto 4380 esté libre.
 3. Abre Reportes → Sistemas → piloto Moodle → Unidad 1 → **Sin entrega**. Anota el corte de Cancún. Por cada matrícula, contrasta la fecha que aparece en el piloto con la prórroga o el ajuste vigente en la tabla de calificación de Moodle. Si Moodle se abre más tarde, compara la diferencia entre el vencimiento y el corte anotado, ya que la pantalla de Moodle usa su propia hora de consulta. Si cambió el envío o la fecha, toma un nuevo corte en ambas vistas.
@@ -102,10 +113,11 @@ Las cuatro fechas provinieron de `mod_assign_get_participant`. Moodle anunció t
 
 ## Servicio web
 
-El token queda en el proceso Node. El destino de las peticiones REST y el curso están fijados en el servidor. La clave local permite exclusivamente estas consultas. La tabla indica las funciones que debe autorizar el servicio web, con un alcance efectivo de lectura de toda la población del curso.
+El token queda en el proceso Node. El destino de las peticiones REST está fijado en el servidor. El curso se resuelve desde el vínculo activo y el lector verifica que la tarea esté en ese curso. La clave local permite exclusivamente estas consultas. La tabla indica las funciones que debe autorizar el servicio web, con un alcance efectivo de lectura de toda la población del curso.
 
 | Función | Uso |
 | --- | --- |
+| core_course_search_courses | Buscar los cursos visibles por ciclo durante la vinculación SPAI |
 | mod_assign_get_assignments | Verificar el curso y obtener las tareas y sus identificadores |
 | core_webservice_get_site_info | Verificar el ID del usuario del token y el build instalado |
 | mod_assign_list_participants | Leer los IDs y estados de la tabla de participantes de la tarea; requiere alcance de lectura de la tabla de calificación |

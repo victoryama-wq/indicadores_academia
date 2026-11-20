@@ -23,9 +23,50 @@ const submissions = users
 const grades = users.slice(0, 18).map((u) => ({ userid: u.id, grade: '8', attemptnumber: 0 }));
 let reads = 0;
 const course = '603. Fundamentos De Contabilidad 27-1';
+let offline = false;
+let secondCourseCatalogAccessible = false;
+let searches = 0,
+  catalogReads = 0;
+const visibleCourses = [
+  { id: 4455, fullname: course },
+  { id: 7120, fullname: '710. Seminario ficticio 27-1' },
+  { id: 7121, fullname: '720. Laboratorio ficticio 27-1' },
+];
 const reader = {
-  catalog: async () => ({ course, courseId: 4455, activities }),
-  snapshot: async (id) => {
+  searchCourses: async (cycle) => {
+    searches++;
+    if (offline) throw new Error('No se pudo consultar Moodle.');
+    return cycle === '27-2'
+      ? [{ id: 8111, fullname: '710. Seminario ficticio 27-2' }]
+      : visibleCourses;
+  },
+  catalog: async (link) => {
+    catalogReads++;
+    if (link.courseId === 7120 && !secondCourseCatalogAccessible)
+      throw new Error('Curso localizado · acceso a entregas pendiente');
+    return {
+      course: link.fullname,
+      courseId: link.courseId,
+      hasRestrictedActivities: link.courseId === 7120,
+      activities:
+        link.courseId === 4455
+          ? activities
+          : [{ ...activities[0], id: 810, name: 'Segunda tarea ficticia' }],
+    };
+  },
+  snapshot: async (id, link) => {
+    if (link.courseId === 7120) throw new Error('Curso localizado · acceso a entregas pendiente');
+    if (link.courseId === 8111) {
+      assert.equal(id, 810);
+      return {
+        ...classify(users.slice(0, 1), submissions.slice(0, 1), [], { kind: 'course' }),
+        course: link.fullname,
+        courseId: 8111,
+        activity: { ...activities[0], id: 810, name: 'Segunda tarea ficticia' },
+        readAt: '2027-01-06T15:00:00Z',
+      };
+    }
+    assert.equal(link.courseId, 4455);
     reads++;
     if (id === activities[1].id) throw new Error('Consulta incompleta en datos ficticios.');
     let result;
@@ -48,6 +89,7 @@ const reader = {
     }
     return {
       course,
+      courseId: 4455,
       activity: activities.find((a) => a.id === id),
       readAt: readAt.toISOString(),
       ...result,
@@ -90,11 +132,109 @@ try {
   await page.goto('http://127.0.0.1:4380/reportes');
   await page.getByRole('combobox', { name: 'Perfil simulado' }).click();
   await page.getByRole('option', { name: 'Sistemas', exact: true }).click();
+  await page.goto('http://127.0.0.1:4380/admin/insumos?periodo=p01');
+  const card = page.getByTestId('input-spai');
+  const offerings = [
+    ['603', 'DEM01 - Fundamentos de Contabilidad', 'Grupo A', 'Grupo B'],
+    ['710', 'Seminario ficticio', 'Grupo C', ''],
+    ['720', 'Laboratorio ficticio', 'Grupo D', ''],
+    ['720', 'Laboratorio ficticio', 'Grupo E', ''],
+    ['800', 'Materia sin curso', 'Grupo F', ''],
+    ['999', 'Inglés', 'ING-FCS', ''],
+  ].map(([numero, materia, grupo, comparte], row) => ({
+    numero,
+    materia,
+    grupo,
+    comparte,
+    hoja: 'SPAI ficticio',
+    fila: row + 2,
+    modalidad: 'Virtual',
+    docente: 'Docente ficticio',
+    carrera: row === 5 ? 'ING' : 'MBA',
+    matriculas: '',
+    celdaNumerica: false,
+    cicloOrigen: '27-1',
+  }));
+  const upload = async (rows, cycle = 'p01') => {
+    await card.locator('input[type=file]').setInputFiles({
+      name: 'asignaciones-demo.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          schemaVersion: 1,
+          tipo: 'spai',
+          ciclo: cycle,
+          filas: [],
+          imparticiones: rows,
+        }),
+      ),
+    });
+    await card.getByRole('button', { name: 'Validar archivo' }).click();
+  };
+  await card.locator('input[type=file]').setInputFiles({
+    name: 'inscripciones-ficticias.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        schemaVersion: 1,
+        tipo: 'spai',
+        ciclo: 'p01',
+        filas: [
+          {
+            ciclo: 'p01',
+            cursoId: 'demo',
+            estudianteId: 'demo',
+            estudiante: 'Estudiante ficticio',
+            matricula: 'TUP0027',
+          },
+        ],
+      }),
+    ),
+  });
+  await card.getByRole('button', { name: 'Activar simulación' }).click();
+  await page.goto('http://127.0.0.1:4380/reportes/moodle?periodo=p01');
+  await page.getByLabel('Clave local del piloto').fill('demo-local');
+  await page.getByRole('button', { name: 'Consultar asignaturas' }).click();
+  await expect(page.getByRole('status')).toContainText('La versión vigente contiene inscripciones');
+  await page.getByRole('link', { name: 'Revisar Insumos por ciclo' }).click();
+  await upload(offerings);
+  assert.equal(searches, 0);
+  await card.getByLabel('Clave local del piloto Moodle').fill('demo-local');
+  await card.getByRole('button', { name: 'Activar simulación' }).click();
+  const summary = card.getByRole('region', { name: 'Vinculación con Moodle' });
+  await expect(summary).toContainText(
+    'Vinculados automáticamente: 2 · Sin coincidencia: 1 · Por revisar: 2',
+  );
+  await expect(summary).toContainText('Grupo base: Grupo A · Comparte con: Grupo B');
+  await expect(summary).toContainText('Virtual · Docente: Docente ficticio');
+  offline = true;
+  await upload(offerings);
+  await card.getByRole('button', { name: 'Activar simulación' }).click();
+  await expect(card.getByText(/Búsqueda no completada/)).toBeVisible();
+  await expect(summary).toHaveCount(0);
+  offline = false;
+  await card.getByRole('button', { name: 'Volver a vincular versión vigente' }).click();
+  await expect(summary.getByRole('link')).toHaveCount(2);
+  await upload([{ ...offerings[0], cicloOrigen: '27-2' }]);
+  await expect(card.getByRole('button', { name: 'Activar simulación' })).toBeDisabled();
+  assert.equal(searches, 3);
+  assert.equal(catalogReads, 0);
+  await expect(summary.getByRole('link')).toHaveCount(2);
+  await page.goto('http://127.0.0.1:4380/admin/insumos?periodo=p02');
+  await upload([{ ...offerings[1], cicloOrigen: '27-2' }], 'p02');
+  await card.getByLabel('Clave local del piloto Moodle').fill('demo-local');
+  await card.getByRole('button', { name: 'Activar simulación' }).click();
+  await expect(summary.getByRole('link')).toHaveText('Abrir asignatura · Moodle 8111');
+  assert.equal(catalogReads, 0);
+  await summary.getByRole('link').click();
+  await expect(page).toHaveURL(/periodo=p02&curso=8111/);
+  await page.goto('http://127.0.0.1:4380/reportes?periodo=p01');
   await page.getByRole('link', { name: 'Abrir piloto local de lectura Moodle' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:4380/reportes/moodle');
+  await expect(page).toHaveURL(/\/reportes\/moodle\?periodo=p01/);
   assert.equal(reads, 0);
   await page.getByLabel('Clave local del piloto').fill('demo-local');
-  await page.getByRole('button', { name: 'Consultar curso' }).click();
+  await page.getByRole('button', { name: 'Consultar asignaturas' }).click();
+  await page.getByLabel('Asignatura vinculada').selectOption('4455');
   await expect(page.locator('.overview-number')).toHaveText(['24', '20']);
   await expect(page.locator('.progress-block b')).toHaveText('90%');
   await expect(page.locator('.state-card strong')).toHaveText(['18', '2', '4', '0', '0']);
@@ -203,6 +343,32 @@ try {
   await page.getByLabel('Actividad', { exact: true }).selectOption('22042');
   await expect(page.getByRole('alert')).toContainText('Consulta incompleta');
   await expect(page.locator('.overview')).toHaveCount(0);
+  await page.getByLabel('Asignatura vinculada').selectOption('7120');
+  await expect(page.getByRole('alert')).toContainText('lista de tareas de este curso (ID 7120)');
+  await expect(page.getByLabel('Actividad', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.overview')).toHaveCount(0);
+  secondCourseCatalogAccessible = true;
+  await page.getByRole('button', { name: 'Reintentar consulta' }).click();
+  await expect(
+    page.getByText('Otras tareas tienen restricciones de acceso.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveText(
+    'Curso localizado · acceso a entregas pendiente',
+  );
+  await expect(page.locator('.overview')).toHaveCount(0);
+  await expect(page.getByLabel('Actividad', { exact: true })).toHaveValue('810');
+  await page.getByLabel('Ciclo', { exact: true }).selectOption('p02');
+  await expect(page.getByLabel('Asignatura vinculada').locator('option')).toHaveText([
+    'Selecciona una asignatura',
+    '710. Seminario ficticio 27-2',
+  ]);
+  await expect(page.getByLabel('Actividad', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.overview, .detail, .section-head')).toHaveCount(0);
+  await page.getByLabel('Asignatura vinculada').selectOption('8111');
+  await expect(page.locator('.overview-number')).toHaveText(['1', '1']);
+  await expect(page.locator('.state-card strong')).toHaveText(['0', '1', '0', '0', '0']);
+  await expect(cut).toContainText('06/01/2027');
   await page.getByRole('button', { name: 'Cerrar consulta' }).click();
   await expect(page.getByLabel('Clave local del piloto')).toBeVisible();
   await page.reload();

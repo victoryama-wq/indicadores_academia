@@ -19,6 +19,8 @@ export interface TeachingRow extends Source {
   grupo: string;
   comparte: string;
   matriculas: string;
+  modalidad?: string;
+  docente?: string;
   celdaNumerica: boolean;
 }
 export const fold = (s: string) =>

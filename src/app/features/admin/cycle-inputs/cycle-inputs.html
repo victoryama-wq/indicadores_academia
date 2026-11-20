@@ -15,7 +15,8 @@
   <p>
     Calendario: XLSX con las dos hojas y cuatro bloques del formato 27-2. Saeko y asignaciones SPAI:
     XLSX o JSON. Otros insumos: JSON ficticio. Hasta 2 MiB y 5000 filas. La simulación se conserva
-    al recargar esta pestaña; no se envía a un servidor. Los perfiles son simulados, no
+    al recargar esta pestaña. El piloto de Sistemas envía al lector local solo el número, la materia
+    y la posición de las imparticiones elegibles para buscar cursos. Los perfiles son simulados, no
     autenticación real.
   </p>
 </div>
@@ -103,11 +104,78 @@
             </div>
           }
           <button type="button" mat-button (click)="sample(type)">
-            Descargar ejemplo ficticio · {{ labels[type] }}
+            Descargar ejemplo ficticio · {{ type === 'spai' ? 'Inscripciones SPAI' : labels[type] }}
           </button>
           @if (type === 'spai') {
+            @if (moodle.local) {
+              <label class="file-label" for="clave-moodle">Clave local del piloto Moodle</label>
+              <input
+                id="clave-moodle"
+                type="password"
+                #secret
+                autocomplete="off"
+                [value]="localKey()"
+                (input)="localKey.set(secret.value)"
+              />
+              <p>Al activar las asignaciones se buscarán los cursos del ciclo.</p>
+              @if (store.version(type, nav.context().periodo); as active) {
+                @if (active.batch.tipo === 'spai' && active.batch.imparticiones) {
+                  <button
+                    mat-button
+                    type="button"
+                    [disabled]="!localKey().trim()"
+                    (click)="moodle.activate(active, localKey())"
+                  >
+                    Volver a vincular versión vigente
+                  </button>
+                }
+              }
+            } @else {
+              <a href="http://127.0.0.1:4380/admin/insumos"
+                >Abrir Insumos en el piloto local de Sistemas</a
+              >
+            }
+            @if (moodle.local && moodle.result(nav.context().periodo)?.message; as message) {
+              <p role="status">{{ message }}</p>
+            }
+            @if (linkage(); as result) {
+              <section aria-label="Vinculación con Moodle">
+                <h3>Vinculación con Moodle</h3>
+                <p role="status">
+                  Vinculados automáticamente: {{ result.linked }} · Sin coincidencia:
+                  {{ result.missing }} · Por revisar: {{ result.review }}
+                </p>
+                <ul>
+                  @for (item of result.rows; track item.link.row) {
+                    <li>
+                      <strong>{{ item.source.numero }} {{ item.source.materia }}</strong> ·
+                      {{ item.source.hoja }}, fila {{ item.source.fila }}
+                      <div>
+                        Grupo base: {{ item.source.grupo }} · Comparte con:
+                        {{ item.source.comparte || '—' }} · Modalidad:
+                        {{ item.source.modalidad || 'Sin informar' }} · Docente:
+                        {{ item.source.docente || 'Sin informar' }}
+                      </div>
+                      @if (item.link.status === 'linked') {
+                        <a
+                          [href]="
+                            '/reportes/moodle?periodo=' +
+                            nav.context().periodo +
+                            '&curso=' +
+                            item.link.courseId
+                          "
+                          >Abrir asignatura · Moodle {{ item.link.courseId }}</a
+                        >
+                      } @else {
+                        <span>{{ item.link.reason }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
             <button type="button" mat-button (click)="sample(type, true)">
-              Descargar asignaciones SPAI ficticias para cruzar con Saeko
+              Descargar plantilla de asignaciones SPAI para vincular con Moodle
             </button>
           }
           <label class="file-label" [for]="'file-' + type">Archivo de {{ labels[type] }}</label>
@@ -161,7 +229,12 @@
               ><button
                 type="button"
                 mat-flat-button
-                [disabled]="!draft.validation?.batch || draft.reading || draft.activated"
+                [disabled]="
+                  !draft.validation?.batch ||
+                  draft.reading ||
+                  draft.activated ||
+                  requiresKey(draft.validation?.batch ?? null)
+                "
                 (click)="activate(type)"
               >
                 Activar simulación

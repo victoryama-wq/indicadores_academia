@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { NavigationContext } from '../../../core/navigation-context';
+import { MoodleLinks } from '../../../core/reporting/moodle-links';
 import { CycleInputStore } from '../../../core/reporting/cycle-input-store';
 import {
   CYCLES,
@@ -47,6 +48,30 @@ interface Draft {
 export class CycleInputs {
   readonly nav = inject(NavigationContext);
   readonly store = inject(CycleInputStore);
+  readonly moodle = inject(MoodleLinks);
+  readonly localKey = signal('');
+  readonly linkage = computed(() => {
+    const cycle = this.nav.context().periodo;
+    const active = this.store.version('spai', cycle);
+    const result = this.moodle.result(cycle);
+    if (
+      !active ||
+      result?.version !== active.version ||
+      !result.links ||
+      active.batch.tipo !== 'spai'
+    )
+      return null;
+    const offerings = active.batch.imparticiones ?? [];
+    const rows = result.links
+      .map((link) => ({ link, source: offerings[link.row] }))
+      .filter((r) => r.source);
+    return {
+      rows,
+      linked: rows.filter((r) => r.link.status === 'linked').length,
+      missing: rows.filter((r) => r.link.status === 'missing').length,
+      review: rows.filter((r) => r.link.status === 'review').length,
+    };
+  });
   readonly cycles = CYCLES;
   readonly types = INPUT_TYPES;
   readonly labels = INPUT_LABELS;
@@ -117,8 +142,12 @@ export class CycleInputs {
               ...draft,
               reading: false,
               imported,
+              validation: type === 'spai' ? imported : null,
               text: imported.batch ? JSON.stringify(imported.batch) : '',
-              message: 'XLSX leído. Valida para revisar las filas e incidencias.',
+              message:
+                type === 'spai'
+                  ? this.validationMessage(imported)
+                  : 'XLSX leído. Valida para revisar las filas e incidencias.',
             },
           }));
         return;
@@ -127,8 +156,19 @@ export class CycleInputs {
         throw new Error('Usa XLSX de calendario, Saeko o SPAI, o una plantilla JSON del insumo.');
       const text = await file.text();
       if (!text.trim()) throw new Error('El archivo está vacío. Se conserva la versión vigente.');
-      if (this.reads.get(key) === token)
-        this.drafts.update((v) => ({ ...v, [key]: { ...draft, reading: false, text } }));
+      if (this.reads.get(key) === token) {
+        const validation = type === 'spai' ? validateInput(text, type, cycle) : null;
+        this.drafts.update((v) => ({
+          ...v,
+          [key]: {
+            ...draft,
+            reading: false,
+            text,
+            validation,
+            message: validation ? this.validationMessage(validation) : '',
+          },
+        }));
+      }
     } catch (error) {
       if (this.reads.get(key) === token)
         this.drafts.update((v) => ({
@@ -141,6 +181,11 @@ export class CycleInputs {
         }));
     }
   }
+  private validationMessage(validation: Validation) {
+    return validation.errors.length
+      ? 'Validación rechazada. La versión vigente no cambia.'
+      : 'Validación correcta. Revisa la vista previa antes de activar.';
+  }
   validate(type: InputType) {
     const d = this.draft(type);
     if (!d || d.reading) return;
@@ -148,16 +193,25 @@ export class CycleInputs {
     this.setDraft(type, {
       ...d,
       validation,
-      message: validation.errors.length
-        ? 'Validación rechazada. La versión vigente no cambia.'
-        : 'Validación correcta. Revisa la vista previa antes de activar.',
+      message: this.validationMessage(validation),
       activated: false,
     });
   }
+  requiresKey(batch: Validation['batch']) {
+    return (
+      this.moodle.local &&
+      batch?.tipo === 'spai' &&
+      (!!batch.imparticiones || !!this.moodle.result(batch.ciclo)?.links) &&
+      !this.localKey().trim()
+    );
+  }
   activate(type: InputType) {
     const d = this.draft(type);
-    if (!d?.validation?.batch || d.reading || d.activated) return;
+    if (!d?.validation?.batch || d.reading || d.activated || this.requiresKey(d.validation.batch))
+      return;
     const error = this.store.activate(type, this.nav.context().periodo, d.text, d.filename);
+    const active = this.store.version(type, this.nav.context().periodo);
+    if (!error && type === 'spai' && active) void this.moodle.activate(active, this.localKey());
     this.setDraft(type, {
       ...d,
       activated: !error,

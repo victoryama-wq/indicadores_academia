@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { classify, moodleReader } from './reader.mjs';
 import { cotejarCurso } from './cotejar-curso.mjs';
+import { matchCourses } from './course-links.mjs';
 import { pilotServer } from './pilot.mjs';
 
 const users = Array.from({ length: 24 }, (_, i) => ({
@@ -16,6 +17,7 @@ const grades = users
   .slice(0, 18)
   .map((u) => ({ userid: u.id, grade: u.id === 1 ? '0.00000' : '8', attemptnumber: 0 }));
 const id = 22041;
+const selected = { courseId: 4455, fullname: '603. Fundamentos De Contabilidad 27-1' };
 const activity = {
   id,
   cmid: 53765,
@@ -104,7 +106,7 @@ test('Las fechas solo enriquecen sin entrega: normal, prórroga vigente, ajuste 
     },
     evidence,
   );
-  const snap = await fixture.reader.snapshot(id);
+  const snap = await fixture.reader.snapshot(id, selected);
   assert.equal(snap.readAt, cut.toISOString());
   assert.deepEqual(
     snap.students.filter((r) => r.state === 'sin-entrega').map((r) => r.dueDate),
@@ -134,7 +136,7 @@ test('Una consulta de prórrogas denegada mantiene al estudiante sin entrega y s
     },
     evidence,
   );
-  const snap = await fixture.reader.snapshot(id);
+  const snap = await fixture.reader.snapshot(id, selected);
   assert.deepEqual(
     snap.students
       .filter((row) => row.state === 'sin-entrega')
@@ -162,7 +164,7 @@ test('Permiso denegado, ID ajeno, prórroga sin fecha y campos ausentes conserva
       mod_assign_get_user_flags: wrap('userflags', [{ userid: 21, extensionduedate: 90 }]),
     },
     evidence,
-  ).reader.snapshot(id);
+  ).reader.snapshot(id, selected);
   assert.deepEqual(
     snap.students.filter((r) => r.state === 'sin-entrega').map((r) => r.dueDate),
     [null, null, null, null],
@@ -171,7 +173,7 @@ test('Permiso denegado, ID ajeno, prórroga sin fecha y campos ausentes conserva
 
 test('El diagnóstico separa la muestra visible del cotejo y respeta funciones ausentes', async () => {
   const fixture = api({ core_webservice_get_site_info: { ...site, functions: [] } });
-  const result = await fixture.reader.probeDueDates(id);
+  const result = await fixture.reader.probeDueDates(id, undefined, selected);
   assert.match(result.mode, /sin cotejo vigente/);
   assert.equal(result.assessed, 1);
   assert.equal(result.confirmed, 0);
@@ -193,7 +195,7 @@ test('Un cotejo de curso completo usa el padrón activo y verifica cada identida
     core_enrol_get_enrolled_users: [...users, { id: site.userid, username: 'TUP0900' }],
     mod_assign_list_participants: [...rows, visible(site.userid)],
   });
-  const result = await cotejarCurso('ficticio', id, 24, until, fixture.request);
+  const result = await cotejarCurso('ficticio', id, 24, until, selected.courseId, fixture.request);
   assert.deepEqual(
     result.evidence.userIds,
     users.map((u) => u.id),
@@ -216,13 +218,14 @@ test('Un cotejo de curso completo usa el padrón activo y verifica cada identida
         id,
         24,
         until,
+        selected.courseId,
         api({ mod_assign_list_participants: response }).request,
       ),
       /Cotejo incompleto/,
     );
   }
   await assert.rejects(
-    cotejarCurso('ficticio', id, 23, until, fixture.request),
+    cotejarCurso('ficticio', id, 23, until, selected.courseId, fixture.request),
     /Cotejo incompleto/,
   );
 });
@@ -234,6 +237,7 @@ test('Un alta en el curso invalida el cotejo completo aunque la tabla de la tare
     id,
     users.length,
     until,
+    selected.courseId,
     api().request,
   );
   const { reader } = api(
@@ -242,7 +246,7 @@ test('Un alta en el curso invalida el cotejo completo aunque la tabla de la tare
     },
     () => saved,
   );
-  const snapshot = await reader.snapshot(id);
+  const snapshot = await reader.snapshot(id, selected);
   assert.equal(snapshot.expectedCount, null);
   assert.equal(snapshot.students.filter((row) => row.state === 'sin-entrega').length, 0);
   assert.equal(snapshot.students.filter((row) => row.state === 'calificadas').length, 18);
@@ -251,7 +255,7 @@ test('Un alta en el curso invalida el cotejo completo aunque la tabla de la tare
 test('El curso y la tarea usan sus propios identificadores y los totales salen de las filas individuales', async () => {
   const { reader, calls } = api({}, evidence);
 
-  const result = await reader.snapshot(id);
+  const result = await reader.snapshot(id, selected);
   assert.equal(result.activity.cmid, 53765);
   assert.equal(result.students.length, 24);
   assert.equal(result.identifiedCount, 24);
@@ -275,7 +279,7 @@ test('El curso y la tarea usan sus propios identificadores y los totales salen d
   assert.equal(JSON.stringify(result).includes('tecplayacar.edu.mx'), false);
 });
 test('La matrícula de curso y la visibilidad técnica no prueban el alcance de la tarea', async () => {
-  const result = await api().reader.snapshot(id);
+  const result = await api().reader.snapshot(id, selected);
   assert.equal(result.identifiedCount, 24);
   assert.equal(result.expectedCount, null);
   assert.ok(result.scopeReason);
@@ -295,7 +299,7 @@ test('Una población verificada de grupo excluye a los demás, incluso después 
     },
     () => audience,
   );
-  const group = await reader.snapshot(id);
+  const group = await reader.snapshot(id, selected);
   assert.equal(group.identifiedCount, 3);
   assert.equal(group.expectedCount, 2);
   assert.deepEqual(
@@ -306,7 +310,7 @@ test('Una población verificada de grupo excluye a los demás, incluso después 
     ],
   );
   audience = evidence([3]);
-  const conflicting = await reader.snapshot(id);
+  const conflicting = await reader.snapshot(id, selected);
   assert.equal(conflicting.expectedCount, null);
   assert.match(conflicting.scopeReason, /difieren/);
   assert.deepEqual(
@@ -327,7 +331,7 @@ for (const present of [true, false]) {
         },
         evidence,
       );
-      const snap = await reader.snapshot(id);
+      const snap = await reader.snapshot(id, selected);
       assert.equal(snap.identifiedCount, 24);
       assert.equal(snap.expectedCount, 24);
       assert.equal(snap.unidentified, 0);
@@ -360,7 +364,10 @@ test('Una lectura parcial o no autorizada conserva la evidencia directa y oculta
     rows.map((r) => (r.id === 24 ? visible(24, 'draft') : r)),
     { exception: 'denied' },
   ]) {
-    const snap = await api({ mod_assign_list_participants: partial }, evidence).reader.snapshot(id);
+    const snap = await api({ mod_assign_list_participants: partial }, evidence).reader.snapshot(
+      id,
+      selected,
+    );
     assert.equal(snap.expectedCount, null);
     assert.ok(snap.scopeReason);
     assert.equal(snap.students.filter((s) => s.state === 'sin-entrega').length, 0);
@@ -377,7 +384,7 @@ test('El cotejo está ligado a versión, cuenta, curso, módulo, tarea y vigenci
     { assignmentId: 2 },
     { validUntil: '2020-01-01T00:00:00Z' },
   ]) {
-    const snap = await api({}, () => ({ ...evidence(), ...change })).reader.snapshot(id);
+    const snap = await api({}, () => ({ ...evidence(), ...change })).reader.snapshot(id, selected);
     assert.equal(snap.expectedCount, null);
   }
 });
@@ -391,7 +398,7 @@ test('Cada corte relee entregas, borradores y casos por revisar de los destinata
     },
     evidence,
   );
-  const initial = await reader.snapshot(id);
+  const initial = await reader.snapshot(id, selected);
   for (const [userId, status] of [
     [21, 'submitted'],
     [22, 'draft'],
@@ -400,7 +407,7 @@ test('Cada corte relee entregas, borradores y casos por revisar de los destinata
     liveRows[userId - 1] = visible(userId, status);
     liveSubmissions.push({ userid: userId, status, attemptnumber: 1 });
   }
-  const updated = await reader.snapshot(id);
+  const updated = await reader.snapshot(id, selected);
   assert.deepEqual(
     updated.students.filter((s) => s.state === 'sin-entrega').map((s) => s.registration),
     ['TUP0024'],
@@ -412,7 +419,7 @@ test('Cada corte relee entregas, borradores y casos por revisar de los destinata
 });
 test('Una identidad de servicio no verificable impide atribuir resultados académicos', async () => {
   await assert.rejects(
-    api({ core_webservice_get_site_info: { version: site.version } }).reader.snapshot(id),
+    api({ core_webservice_get_site_info: { version: site.version } }).reader.snapshot(id, selected),
     /incompletos/,
   );
 });
@@ -454,7 +461,7 @@ test('Moodle puede devolver un aviso específico por falta de registros', async 
     evidence,
   );
   assert.equal(
-    (await reader.snapshot(id)).students.filter((r) => r.state === 'sin-entrega').length,
+    (await reader.snapshot(id, selected)).students.filter((r) => r.state === 'sin-entrega').length,
     24,
   );
 });
@@ -470,11 +477,11 @@ test('Permisos insuficientes, excepciones y ausencia inexplicada del bloque inte
     { mod_assign_get_grades: wrap('grades', [{ userid: 1, attemptnumber: 0 }]) },
     { core_enrol_get_enrolled_users: { exception: 'accessexception', errorcode: 'denied' } },
   ])
-    await assert.rejects(api(override).reader.snapshot(id));
+    await assert.rejects(api(override).reader.snapshot(id, selected));
 });
 test('Únicamente permite tareas del curso confirmado y aptas para seguimiento individual', async () => {
   const bad = api();
-  await assert.rejects(bad.reader.snapshot(53765));
+  await assert.rejects(bad.reader.snapshot(53765, selected));
   assert.equal(bad.calls.length, 1);
   for (const variant of [{ teamsubmission: 1 }, { blindmarking: 1 }, { nosubmissions: 1 }]) {
     const restricted = api({
@@ -482,26 +489,190 @@ test('Únicamente permite tareas del curso confirmado y aptas para seguimiento i
         courses: [{ ...catalog.courses[0], assignments: [{ ...activity, ...variant }] }],
       },
     });
-    await assert.rejects(restricted.reader.snapshot(id));
+    await assert.rejects(restricted.reader.snapshot(id, selected));
     assert.equal(restricted.calls.length, 1);
   }
 });
 test('La API local protege los datos antes de contactar a Moodle', async (t) => {
-  const { reader, calls } = api();
+  const { reader, calls } = api({
+    core_course_search_courses: { total: 1, courses: catalog.courses },
+  });
   const server = pilotServer(reader, 'clave-ficticia');
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
-  const url = 'http://127.0.0.1:' + server.address().port + '/api/moodle/actividades';
+  const url =
+    'http://127.0.0.1:' +
+    server.address().port +
+    '/api/moodle/vinculos/12345678-1111-4444-8888-123456789abc/p01/1';
   const options = { headers: { authorization: 'Bearer clave-ficticia' } };
   assert.equal((await fetch(url)).status, 401);
   assert.equal(
     (await fetch(url, { headers: { ...options.headers, origin: 'https://ejemplo.test' } })).status,
     403,
   );
-  assert.equal((await fetch(url, { ...options, method: 'POST' })).status, 405);
+  assert.equal((await fetch(url, { ...options, method: 'DELETE' })).status, 405);
   assert.equal(calls.length, 0);
-  const ok = await fetch(url, options);
+  assert.equal((await fetch(url, options)).status, 409);
+  const post = await fetch(url, {
+    ...options,
+    method: 'POST',
+    body: JSON.stringify([{ row: 0, numero: '603.', materia: 'Fundamentos de Contabilidad' }]),
+  });
+  assert.equal(post.status, 200);
+  assert.equal((await post.json())[0].courseId, 4455);
+  assert.deepEqual(
+    calls.map(([fn]) => fn),
+    ['core_course_search_courses'],
+  );
+  assert.equal((await fetch(url + '/1/actividades', options)).status, 404);
+  assert.equal(
+    (await fetch(url.replace('/p01/', '/p02/') + '/4455/actividades', options)).status,
+    409,
+  );
+  const ok = await fetch(url + '/4455/actividades', options);
   assert.equal(ok.status, 200);
   assert.equal(ok.headers.get('cache-control'), 'no-store');
   assert.equal((await ok.json()).courseId, 4455);
+});
+
+test('La vinculación exige el número, la materia y el ciclo final; una colisión nunca asigna el ID', () => {
+  const offerings = [
+    { row: 0, numero: '01.', materia: 'Historia' },
+    { row: 1, numero: '1', materia: 'Historia' },
+    { row: 2, numero: '2', materia: 'Geografía' },
+    { row: 3, numero: '2.', materia: 'Geografía' },
+    { row: 4, numero: '3', materia: 'Biología' },
+    { row: 5, numero: '4', materia: 'Lógica' },
+  ];
+  const courses = [
+    [51, '01. HISTORIA 27-1'],
+    [52, '1. Historia 27-2'],
+    [53, '2. Geografia 27-1'],
+    [54, '3 Biología 27-1'],
+    [55, '3. Biología 27-1'],
+    [56, '4. Lógica formal 27-1'],
+    [57, '4. Lógica 27-1 Grupo A'],
+  ].map(([id, fullname]) => ({ id, fullname }));
+  const links = matchCourses('p01', offerings, courses);
+  assert.deepEqual(
+    links.map((l) => l.status),
+    ['linked', 'missing', 'review', 'review', 'review', 'missing'],
+  );
+  assert.deepEqual(
+    links.flatMap((l) => l.courseId ?? []),
+    [51],
+  );
+  assert.equal(matchCourses('p02', offerings, courses)[1].courseId, 52);
+});
+
+test('Una clave académica de SPAI admite el título completo de Moodle sin ocultar colisiones', () => {
+  const row = { row: 0, numero: '77.', materia: 'MAT01 - Álgebra lineal' };
+  const course = { id: 13, fullname: '77. Algebra lineal 27-1' };
+  const exact = { id: 14, fullname: '77. MAT01 - Álgebra lineal 27-1' };
+  const match = (rows, courses) => matchCourses('p01', rows, courses);
+  assert.equal(match([row], [course])[0].courseId, 13);
+  assert.equal(match([row], [exact])[0].courseId, 14);
+  assert.equal(match([row], [course, exact])[0].status, 'review');
+  assert.deepEqual(
+    match([row, { ...row, row: 1, materia: 'Álgebra lineal' }], [course]).map((r) => r.status),
+    ['review', 'review'],
+  );
+  assert.equal(
+    match([row], [{ ...course, fullname: '77. MAT02 - Álgebra lineal 27-1' }])[0].status,
+    'missing',
+  );
+});
+
+test('Una búsqueda incompleta o denegada no se presenta como catálogo vacío', async () => {
+  const search = (response) =>
+    api({ core_course_search_courses: response }).reader.searchCourses('27-1');
+  assert.deepEqual(await search({ total: 0, courses: [] }), []);
+  await assert.rejects(search({ total: 1, courses: [] }));
+  await assert.rejects(search({ exception: 'webservice_access_exception' }));
+});
+
+test('Un reemplazo invalida la lectura anterior aunque falle la conexión; cada ciclo mantiene sus propios cursos', async (t) => {
+  let offline = false;
+  const fixture = api({
+    core_course_search_courses: (params) => {
+      if (offline) throw Error('Sin conexión');
+      const cycle = params.get('criteriavalue');
+      return {
+        total: 1,
+        courses: [{ id: cycle === '27-1' ? 91 : 92, fullname: '11. Curso ficticio ' + cycle }],
+      };
+    },
+  });
+  const server = pilotServer(fixture.reader, 'ficticia');
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base =
+    'http://127.0.0.1:' +
+    server.address().port +
+    '/api/moodle/vinculos/12345678-1111-4444-8888-123456789abc/';
+  const headers = { authorization: 'Bearer ficticia' };
+  const post = (path) =>
+    fetch(base + path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify([{ row: 0, numero: '11', materia: 'Curso ficticio' }]),
+    });
+  assert.equal((await (await post('p01/1')).json())[0].courseId, 91);
+  assert.equal((await (await post('p02/1')).json())[0].courseId, 92);
+  offline = true;
+  assert.equal((await post('p01/2')).status, 502);
+  for (const path of ['p01/1/4455/actividades', 'p01/2/4455/actividades'])
+    assert.equal((await fetch(base + path, { headers })).status, 409);
+  assert.equal((await post('p01/1')).status, 409);
+  assert.equal((await (await fetch(base + 'p02/1', { headers })).json())[0].courseId, 92);
+});
+
+test('El servidor verifica el nombre vigente, la pertenencia de la tarea y el permiso de entregas por curso', async () => {
+  const second = { courseId: 7001, fullname: '710. Materia ficticia 27-2' };
+  const fixture = api({
+    mod_assign_get_assignments: {
+      courses: [{ id: 7001, fullname: second.fullname, assignments: [{ ...activity, id: 7002 }] }],
+    },
+    mod_assign_get_submissions: {
+      exception: 'required_capability_exception',
+      errorcode: 'nopermissions',
+    },
+  });
+  await assert.rejects(fixture.reader.snapshot(id, second), /Esta actividad/);
+  assert.deepEqual(
+    fixture.calls.map(([fn]) => fn),
+    ['mod_assign_get_assignments'],
+  );
+  await assert.rejects(
+    fixture.reader.catalog({ ...second, fullname: '710. Materia ficticia 27-1' }),
+    /curso cambió/,
+  );
+  await assert.rejects(
+    fixture.reader.snapshot(7002, second),
+    /Curso localizado · acceso a entregas pendiente/,
+  );
+});
+
+test('El catálogo distingue un módulo restringido de la denegación del curso', async () => {
+  const denied = { item: 'module', itemid: 7212, warningcode: '1' };
+  const readerFor = (assignments, warnings) =>
+    api({
+      mod_assign_get_assignments: { courses: [{ ...catalog.courses[0], assignments }], warnings },
+    }).reader;
+  const visible = await readerFor([activity], [denied]).catalog(selected);
+  assert.equal(visible.hasRestrictedActivities, true);
+  assert.deepEqual(
+    visible.activities.map((a) => a.id),
+    [id],
+  );
+  await assert.rejects(readerFor([], [denied]).catalog(selected), /mod\/assign:view/);
+  await assert.rejects(
+    readerFor([activity], [{ ...denied, itemid: activity.cmid }]).catalog(selected),
+    /datos incompletos/,
+  );
+  await assert.rejects(
+    readerFor([activity], [denied, { ...denied, item: 'course' }]).catalog(selected),
+    /acceso a entregas pendiente$/,
+  );
+  assert.equal((await readerFor([], []).catalog(selected)).hasRestrictedActivities, false);
 });
