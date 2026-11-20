@@ -676,3 +676,30 @@ test('El catálogo distingue un módulo restringido de la denegación del curso'
   );
   assert.equal((await readerFor([], []).catalog(selected)).hasRestrictedActivities, false);
 });
+
+test('selecciona el cotejo por curso y tarea al alternar actividades y admite el formato anterior', async (t) => {
+  const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { readEvidence, saveEvidence } = await import('./cotejos.mjs');
+  const dir = await mkdtemp(join(tmpdir(), 'academia-cotejos-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const base = join(dir, 'cotejo.json');
+  const read = (courseId, id) => readEvidence({ courseId, activity: { id } }, base);
+  const a = { courseId: 101, assignmentId: 11, userIds: [1, 2] };
+  const b = { courseId: 102, assignmentId: 12, userIds: [3] };
+  const otraTarea = { courseId: 101, assignmentId: 13, userIds: [2] };
+  await writeFile(base, JSON.stringify(a));
+  assert.deepEqual(await read(101, 11), a);
+  assert.equal(await read(102, 12), undefined);
+  await Promise.all([saveEvidence(a, base), saveEvidence(b, base), saveEvidence(otraTarea, base)]);
+  for (const expected of [a, otraTarea, a, b, a]) {
+    assert.deepEqual(await read(expected.courseId, expected.assignmentId), expected);
+  }
+  assert.equal(await read(101, 12), undefined);
+  const updated = { ...a, userIds: [1] };
+  await saveEvidence(updated, base);
+  assert.deepEqual(await read(101, 11), updated);
+  assert.deepEqual(await read(102, 12), b);
+  assert.deepEqual(await read(101, 13), otraTarea);
+});

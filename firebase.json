@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "target": "vista-sistemas",
+    "public": "preview/public",
+    "cleanUrls": false,
+    "rewrites": [
+      { "source": "**", "function": { "functionId": "vistaAcademia", "region": "us-central1" } }
+    ]
+  },
+  "functions": {
+    "source": "preview/functions",
+    "codebase": "vista-academia",
+    "ignore": ["node_modules", ".git", "*.local", ".env*", "**/*.test.mjs"],
+    "predeploy": ["npm run build:vista"]
+  }
+}

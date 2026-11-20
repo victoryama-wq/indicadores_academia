@@ -43,6 +43,22 @@ jobs:
       - name: Verificar lector Moodle con datos ficticios
         run: npm run test:moodle
 
+      - name: Compilar la vista privada de Coordinación
+        run: npm run build:vista
+
+      - name: Configurar Node.js para la función de vista previa
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: preview/functions/package-lock.json
+
+      - name: Instalar dependencias de la función
+        run: npm ci --engine-strict --prefix preview/functions
+
+      - name: Comprobar acceso a la vista previa con identidades ficticias
+        run: node --test preview/functions/gateway.test.mjs
+
   e2e-edge:
     name: E2E Edge
     runs-on: ubuntu-24.04

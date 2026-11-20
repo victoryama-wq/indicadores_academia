@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ingreso · Indicadores de Academia</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: #f4f6fa;
+        color: #122745;
+        font:
+          1rem/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        width: min(100%, 26rem);
+        padding: clamp(1.5rem, 5vw, 3rem);
+        background: white;
+        border: 1px solid #d1daea;
+        border-top: 0.35rem solid #183d76;
+        border-radius: 1rem;
+        box-shadow: 0 0.5rem 2rem #16365c12;
+      }
+      h1 {
+        font-size: 1.6rem;
+        line-height: 1.2;
+      }
+      button {
+        border: 0;
+        border-radius: 0.4rem;
+        padding: 0.8rem 1rem;
+        background: #143a76;
+        color: white;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #476bab;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Indicadores de Academia</h1>
+      <p>Vista previa de Coordinación. Ingresa con la cuenta de Sistemas autorizada.</p>
+      <button type="button" id="ingresar" disabled>Ingresar con Google</button>
+      <p id="estado" role="status"></p>
+      <script type="module" src="/ingreso.js"></script>
+    </main>
+  </body>
+</html>

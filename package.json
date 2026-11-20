@@ -5,6 +5,8 @@
     "ng": "ng",
     "start": "ng serve --host 127.0.0.1 --port 4300 --poll=1000",
     "build": "ng build",
+    "build:vista": "ng build --configuration production --define ACADEMIA_VISTA_COORDINACION=true --output-path preview/functions/app",
+    "test:vista:ui": "node --test scripts/vista.browser.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
     "test:e2e": "playwright test",

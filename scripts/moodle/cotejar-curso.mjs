@@ -1,6 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import { rename, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { saveEvidence } from './cotejos.mjs';
 import { text } from 'node:stream/consumers';
 import { pathToFileURL } from 'node:url';
 import { moodleReader } from './reader.mjs';
@@ -65,17 +63,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
       until,
       Number(course),
     );
-    const target =
-      process.env.MOODLE_COBERTURA_LOCAL || join(process.env.LOCALAPPDATA, 'cotejo-moodle.json');
-    const temporary = target + '.' + randomUUID() + '.tmp';
-    try {
-      await writeFile(temporary, JSON.stringify(evidence), { flag: 'wx', mode: 0o600 });
-      await rename(temporary, target);
-    } finally {
-      await unlink(temporary).catch((error) => {
-        if (error.code !== 'ENOENT') throw error;
-      });
-    }
+    await saveEvidence(evidence);
     const missing = snapshot.students.filter((r) => r.state === 'sin-entrega').length;
     console.log(
       'Cotejo guardado. Estudiantes:',

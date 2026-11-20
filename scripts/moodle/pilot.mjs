@@ -2,8 +2,9 @@ import { text } from 'node:stream/consumers';
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readEvidence } from './cotejos.mjs';
 import { courseLinkRoutes } from './course-links.mjs';
 import { moodleReader } from './reader.mjs';
 
@@ -81,23 +82,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     : process.env.MOODLE_TOKEN?.trim();
   delete process.env.MOODLE_TOKEN;
   if (!token) throw new Error('Proporciona el token al iniciar el piloto desde PowerShell.');
-  const coveragePath =
-    process.env.MOODLE_COBERTURA_LOCAL ||
-    (process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'cotejo-moodle.json'));
-  const reader = moodleReader(
-    token,
-    fetch,
-    coveragePath
-      ? async () => {
-          try {
-            return JSON.parse((await readFile(coveragePath, 'utf8')).replace(/^\uFEFF/, ''));
-          } catch (error) {
-            if (error.code === 'ENOENT') return undefined;
-            throw error;
-          }
-        }
-      : undefined,
-  );
+  const reader = moodleReader(token, fetch, readEvidence);
   const probe = process.argv.indexOf('--comprobar-participantes');
   const dateProbe = process.argv.indexOf('--comprobar-fechas');
   const courseArg = process.argv.indexOf('--curso');

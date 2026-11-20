@@ -11,6 +11,8 @@ import {
   StateFilter,
 } from './models';
 
+declare const ACADEMIA_VISTA_COORDINACION: boolean;
+
 @Injectable({ providedIn: 'root' })
 export class NavigationContext {
   private readonly router = inject(Router);
@@ -32,6 +34,8 @@ export class NavigationContext {
       ).map(([key, value]) => [key, String(p[key] ?? value)]),
     ) as unknown as QueryContext;
   });
+  readonly vistaCoordinacion =
+    typeof ACADEMIA_VISTA_COORDINACION !== 'undefined' && ACADEMIA_VISTA_COORDINACION;
   readonly profile = signal<Profile>(this.readProfile());
   readonly profileLabel = computed(
     () =>
@@ -109,6 +113,7 @@ export class NavigationContext {
     });
   }
   setProfile(profile: Profile) {
+    if (this.vistaCoordinacion) return;
     this.profile.set(profile);
     try {
       sessionStorage.setItem('academia-profile', profile);
@@ -140,6 +145,7 @@ export class NavigationContext {
     return this.router.navigate(['/docentes'], { queryParams: TEACHER_CONTEXT });
   }
   private readProfile(): Profile {
+    if (this.vistaCoordinacion) return 'coordinacion';
     try {
       const v = sessionStorage.getItem('academia-profile');
       return v === 'direccion' || v === 'sistemas' ? v : 'coordinacion';

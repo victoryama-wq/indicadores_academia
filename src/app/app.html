@@ -91,9 +91,9 @@
     }
   </nav>
   <div class="sidebar-footer">
-    <span class="status-dot"></span> Entorno local de demostración<small
-      >Versión 0.1 · Sin conexión a Moodle</small
-    >
+    <span class="status-dot"></span>
+    {{ nav.vistaCoordinacion ? 'Vista previa de Coordinación' : 'Entorno local de demostración'
+    }}<small>Versión 0.1 · Sin conexión a Moodle</small>
   </div>
 </aside>
 <div class="workspace" [inert]="menuOpen()">
@@ -118,12 +118,16 @@
     </div>
     <div class="flex items-center gap-3">
       <span class="demo-badge">Datos simulados</span>
-      @defer (on idle) {
-        <app-profile-selector />
-      } @placeholder {
-        <button type="button" mat-button class="profile-placeholder" disabled aria-busy="true">
-          {{ nav.profileLabel() }}
-        </button>
+      @if (nav.vistaCoordinacion) {
+        <form method="post" action="/salir"><button type="submit" mat-button>Salir</button></form>
+      } @else {
+        @defer (on idle) {
+          <app-profile-selector />
+        } @placeholder {
+          <button type="button" mat-button class="profile-placeholder" disabled aria-busy="true">
+            {{ nav.profileLabel() }}
+          </button>
+        }
       }
       <span class="avatar desktop-caption" aria-hidden="true">{{
         nav.profileLabel().slice(0, 2).toUpperCase()
@@ -164,7 +168,8 @@
       <router-outlet />
     }
     <footer class="page-footer">
-      <span>TEC PLAYA / Academia</span><span>Datos ficticios · Demo local · America/Cancun</span>
+      <span>TEC PLAYA / Academia</span>
+      <span>Datos ficticios · {{ nav.vistaCoordinacion ? 'Vista de Coordinación' : 'Demo local' }} · America/Cancun</span>
     </footer>
   </main>
 </div>

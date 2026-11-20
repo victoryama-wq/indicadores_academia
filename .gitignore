@@ -44,3 +44,10 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Vista previa Firebase
+/preview/functions/app/
+/preview/functions/node_modules/
+/preview/functions/.env*
+/.firebase/
+/firebase-debug*.log

@@ -61,7 +61,7 @@ El avance divide las calificadas entre las calificadas más las pendientes del i
    $tarea = Read-Host 'ID de tarea'; $total = Read-Host 'Estudiantes activos que deben entregar'; $hasta = Read-Host 'Vigente hasta (ISO con zona)'; [System.Net.NetworkCredential]::new('', (Read-Host 'Token de Moodle' -AsSecureString)).Password | node .\scripts\moodle\cotejar-curso.mjs $tarea $total $hasta (Read-Host 'ID del curso Moodle')
    ```
 
-   El archivo se guarda en `%LOCALAPPDATA%\cotejo-moodle.json` por defecto. Con el servidor actualizado, pulsa **Actualizar lectura** y abre **Sin entrega**. Cada actualización comprueba que el padrón activo conserve las identidades cotejadas para todo el curso. Si cambia la matrícula, cambia la asignación o vence la vigencia, revisa el alcance antes de renovarlo. Para una tarea dirigida a un subconjunto del curso, utiliza el cotejo específico del paso 3.
+   Cada cotejo se guarda en `%LOCALAPPDATA%\cotejo-moodle.json.d\<curso>-<tarea>.json` por defecto. Cambiar de actividad selecciona su archivo en cada lectura. Con el servidor actualizado, pulsa **Actualizar lectura** y abre **Sin entrega**. Cada actualización comprueba que el padrón activo conserve las identidades cotejadas para todo el curso. Si cambia la matrícula, cambia la asignación o vence la vigencia, revisa el alcance antes de renovarlo. Para una tarea dirigida a un subconjunto del curso, utiliza el cotejo específico del paso 3.
 
 3. Guarda ese cotejo únicamente en el equipo, fuera del repositorio, en un JSON UTF-8. Este ejemplo es **ficticio**. Sustituye los identificadores, el build exacto impreso por el diagnóstico y los límites de vigencia por los del cotejo. `userIds` incluye exclusivamente estudiantes, cada uno una sola vez. Acota la vigencia al intervalo que puedas respaldar. Si cambian las restricciones o asignaciones, retira o actualiza el cotejo antes de la siguiente lectura.
 
@@ -73,7 +73,7 @@ El avance divide las calificadas entre las calificadas más las pendientes del i
    }
    ```
 
-4. Usa la ruta de ese archivo en la misma terminal de arranque. Por ejemplo, para un archivo privado guardado directamente en tu carpeta local de aplicaciones:
+4. Para conservar varios cotejos manuales, guarda cada JSON en la carpeta anterior con el nombre de curso y tarea. El piloto también admite el archivo individual anterior cuando falta el específico y coinciden sus identificadores. Si usas una ruta personalizada, la carpeta de cotejos es esa ruta seguida de `.d`. Configúrala en la terminal donde generas los cotejos y donde arrancas el piloto. Por ejemplo, para un archivo privado guardado directamente en tu carpeta local de aplicaciones:
 
    ```powershell
    $env:MOODLE_COBERTURA_LOCAL = Join-Path $env:LOCALAPPDATA 'cotejo-moodle.json'
