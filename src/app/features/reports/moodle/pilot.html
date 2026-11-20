@@ -2,7 +2,7 @@
   <div>
     <span class="eyebrow">REPORTES / MOODLE</span>
     <h1>Seguimiento de tareas</h1>
-    <p>Piloto de lectura · Ciclo 27-1</p>
+    <p>Piloto de lectura de Sistemas</p>
   </div>
   @if (key()) {
     <button mat-stroked-button (click)="key.set('')">Cerrar consulta</button>
@@ -22,15 +22,74 @@
       aria-describedby="key-help"
     />
     <small id="key-help">Usa la clave que aparece en la terminal al iniciar el piloto.</small>
-    <button mat-flat-button type="submit">Consultar curso <app-ui-icon name="arrowRight" /></button>
+    <button mat-flat-button type="submit">
+      Consultar asignaturas <app-ui-icon name="arrowRight" />
+    </button>
   </form>
 } @else {
+  <section class="panel course">
+    <div>
+      <label for="ciclo-moodle">Ciclo</label>
+      <select id="ciclo-moodle" #periodo (change)="switchCourse(periodo.value)">
+        @for (c of cycles; track c.value) {
+          <option [value]="c.value" [selected]="cycle() === c.value">{{ c.label }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label for="curso-moodle">Asignatura vinculada</label>
+      <select id="curso-moodle" #curso (change)="switchCourse(cycle(), curso.value)">
+        <option value="" [selected]="!selected()">Selecciona una asignatura</option>
+        @for (r of linked(); track r.courseId) {
+          <option [value]="r.courseId" [selected]="selected()?.courseId === r.courseId">
+            {{ r.fullname }}
+          </option>
+        }
+      </select>
+    </div>
+    @if (links.isLoading()) {
+      <p role="status">Consultando los vínculos vigentes…</p>
+    }
+    @if (links.error(); as error) {
+      <p role="alert">{{ error.message }}</p>
+    } @else if (!base()) {
+      <p role="status">
+        {{
+          bindingResult()?.message ??
+            'Aún no hay una vinculación de SPAI en esta pestaña para el ciclo seleccionado.'
+        }}
+        Revisa la versión de asignaciones en Insumos por ciclo.
+      </p>
+    } @else if (links.hasValue() && !linked().length) {
+      @if (links.value().length) {
+        <p role="status">
+          Búsqueda completada sin vínculos automáticos. Consulta las filas sin coincidencia o por
+          revisar en Insumos.
+        </p>
+      } @else {
+        <p role="status">
+          La versión activa no contiene imparticiones elegibles para vincular. Revisa el archivo de
+          asignaciones y las exclusiones del ciclo.
+        </p>
+      }
+    }
+    <a [href]="'/admin/insumos?periodo=' + cycle()">Revisar Insumos por ciclo</a>
+  </section>
   @if (catalog.isLoading()) {
     <p class="notice info" role="status">Consultando el curso…</p>
   }
   @if (catalog.error(); as error) {
     <div class="notice warning">
-      <p role="alert">{{ error.message }}</p>
+      <div role="alert">
+        <p>{{ error.message }}</p>
+        @if (error.message === 'Curso localizado · acceso a entregas pendiente') {
+          <p>
+            Moodle no devolvió la lista de tareas de este curso (ID {{ selected()?.courseId }}).
+            Comprueba en Moodle la matrícula activa de la cuenta técnica y su acceso a las tareas.
+            Cuando tenga acceso, pulsa «Reintentar consulta».
+          </p>
+        }
+      </div>
       <button mat-button (click)="catalog.reload()">Reintentar consulta</button>
     </div>
   }
@@ -61,6 +120,11 @@
       </div>
       @if (!catalog.value().activities.length) {
         <p>No hay tareas visibles en este curso.</p>
+      }
+      @if (catalog.value().hasRestrictedActivities) {
+        <p role="status">
+          Moodle muestra las tareas accesibles. Otras tareas tienen restricciones de acceso.
+        </p>
       }
       @if (activity(); as a) {
         @if (!a.supported) {
@@ -125,7 +189,14 @@
     }
     @if (state(); as status) {
       <section class="panel detail">
-        <a mat-button routerLink="." [queryParams]="{ actividad: data.activity.id }"
+        <a
+          mat-button
+          routerLink="."
+          [queryParams]="{
+            periodo: cycle(),
+            curso: selected()?.courseId,
+            actividad: data.activity.id,
+          }"
           ><app-ui-icon name="arrowLeft" /> Volver al resumen</a
         >
         @let missingUnknown = status === 'sin-entrega' && data.expectedCount === null;
@@ -192,7 +263,12 @@
             class="metric state-card"
             [attr.data-state]="s"
             routerLink="."
-            [queryParams]="{ actividad: data.activity.id, estado: s }"
+            [queryParams]="{
+              periodo: cycle(),
+              curso: selected()?.courseId,
+              actividad: data.activity.id,
+              estado: s,
+            }"
           >
             <span class="tile"><app-ui-icon [name]="icons[s]" /></span>
             @let missingUnknown = s === 'sin-entrega' && data.expectedCount === null;
@@ -215,10 +291,13 @@
           >.
         </p>
         <p>
-          El grupo de origen y la asignación requieren cotejo con Saeko y SPAI. El calendario
-          oficial de 27-1 está pendiente para determinar vencimientos.
+          El vínculo identifica el curso Moodle de la impartición. Los destinatarios de cada
+          actividad requieren su propio cotejo.
         </p>
-        <small>Curso 4455 · Módulo {{ data.activity.cmid }} · Tarea {{ data.activity.id }}</small>
+        <small
+          >Curso {{ data.courseId }} · Módulo {{ data.activity.cmid }} · Tarea
+          {{ data.activity.id }}</small
+        >
       </div>
     </aside>
   }

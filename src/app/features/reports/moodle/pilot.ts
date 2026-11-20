@@ -9,6 +9,8 @@ import {
 import { UiIcon, type UiIconName } from '../../../shared/ui-icon/ui-icon';
 import { MatButtonModule } from '@angular/material/button';
 import { moodleDelay } from './moodle-delay';
+import { MoodleLinks, type CourseLink, localQuery } from '../../../core/reporting/moodle-links';
+import { CYCLES } from '../../../core/reporting/report-models';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -30,6 +32,7 @@ interface Activity {
 interface Catalog {
   course: string;
   activities: Activity[];
+  hasRestrictedActivities: boolean;
 }
 interface Row {
   registration: string;
@@ -39,6 +42,7 @@ interface Row {
   updatedAt: string | null;
 }
 interface Snapshot {
+  courseId: number;
   course: string;
   activity: Activity;
   students: Row[];
@@ -47,18 +51,6 @@ interface Snapshot {
   expectedCount: number | null;
   scopeReason: string | null;
   readAt: string;
-}
-
-async function query<T>(path: string, key: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch('/api/moodle/actividades' + path, {
-    headers: { Authorization: 'Bearer ' + key },
-    cache: 'no-store',
-    redirect: 'error',
-    signal,
-  });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error || 'No se pudo completar la lectura.');
-  return body;
 }
 
 @Component({
@@ -134,25 +126,58 @@ export class MoodlePilot {
   readonly key = signal('');
   readonly sequence = signal(0);
   readonly increment = (value: number) => value + 1;
+  private readonly bindings = inject(MoodleLinks);
+  readonly cycles = CYCLES;
+  readonly cycle = computed(() => this.params().get('periodo') ?? 'p01');
+  readonly bindingResult = computed(() => this.bindings.result(this.cycle()));
+  readonly base = computed(() => {
+    const cycle = this.cycle(),
+      entry = this.bindingResult();
+    return entry?.links ? this.bindings.path(cycle, entry.version) : undefined;
+  });
+  readonly links = resource({
+    params: () => {
+      const base = this.base(),
+        key = this.key();
+      return base && key ? { base, key } : undefined;
+    },
+    loader: ({ params, abortSignal }) =>
+      localQuery<CourseLink[]>(params.base, params.key, { signal: abortSignal }),
+  });
+  readonly linked = computed(() =>
+    this.links.hasValue() ? this.links.value().filter((r) => r.status === 'linked') : [],
+  );
+  readonly selected = computed(() =>
+    this.linked().find((r) => String(r.courseId) === this.params().get('curso')),
+  );
+  readonly coursePath = computed(() => {
+    const selected = this.selected();
+    return selected ? this.base() + '/' + selected.courseId + '/actividades' : undefined;
+  });
   readonly catalog = resource({
-    params: () => this.key() || undefined,
-    loader: ({ params, abortSignal }) => query<Catalog>('', params, abortSignal),
+    params: () => {
+      const path = this.coursePath();
+      return path ? { path, key: this.key(), refresh: this.sequence() } : undefined;
+    },
+    loader: ({ params, abortSignal }) =>
+      localQuery<Catalog>(params.path, params.key, { signal: abortSignal }),
   });
   readonly activity = computed(() => {
     if (!this.catalog.hasValue()) return undefined;
     const activities = this.catalog.value().activities;
     const requested = this.params().get('actividad');
     return requested === null
-      ? (activities.find((a) => a.id === 22041) ?? activities[0])
+      ? (activities.find((a) => a.supported) ?? activities[0])
       : activities.find((a) => String(a.id) === requested);
   });
   readonly snapshot = resource({
     params: () => {
       const a = this.activity(),
         key = this.key();
-      return key && a?.supported ? { id: a.id, key, refresh: this.sequence() } : undefined;
+      return key && a?.supported ? { path: this.coursePath() + '/' + a.id, key } : undefined;
     },
-    loader: ({ params, abortSignal }) => query<Snapshot>('/' + params.id, params.key, abortSignal),
+    loader: ({ params, abortSignal }) =>
+      localQuery<Snapshot>(params.path, params.key, { signal: abortSignal }),
   });
   readonly state = computed(() => {
     const value = this.params().get('estado');
@@ -185,7 +210,13 @@ export class MoodlePilot {
     this.key.set(input.value.trim());
     input.value = '';
   }
+  scope() {
+    return { periodo: this.cycle(), curso: this.selected()?.courseId };
+  }
+  switchCourse(cycle: string, curso?: string) {
+    void this.router.navigate([], { queryParams: { periodo: cycle, curso } });
+  }
   choose(id: string) {
-    void this.router.navigate([], { queryParams: { actividad: id } });
+    void this.router.navigate([], { queryParams: { ...this.scope(), actividad: id } });
   }
 }

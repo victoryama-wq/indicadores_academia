@@ -1,7 +1,7 @@
 import { effectiveDueDates } from './due-dates.mjs';
 
 const endpoint = 'https://moodle2.tecplayacar.edu.mx/webservice/rest/server.php';
-const courseId = 4455;
+const accessPending = () => new Error('Curso localizado · acceso a entregas pendiente');
 const invalid = () =>
   new Error('Moodle devolvió datos incompletos. Revisa el alcance de lectura del servicio.');
 
@@ -37,6 +37,24 @@ export function moodleReader(token, request = fetch, readAudience) {
       result.errorcode ||
       list(result.warnings ?? []).some((w) => !emptyWarning?.(w))
     ) {
+      const denied = [
+        'accessexception',
+        'webservice_access_exception',
+        'nopermissions',
+        'required_capability_exception',
+      ];
+      if (
+        [
+          'mod_assign_get_assignments',
+          'mod_assign_get_submissions',
+          'mod_assign_get_grades',
+          'core_enrol_get_enrolled_users',
+        ].includes(fn) &&
+        (denied.includes(result?.errorcode) ||
+          denied.includes(result?.exception) ||
+          result?.warnings?.some?.((w) => ['1', '2'].includes(String(w.warningcode))))
+      )
+        throw accessPending();
       const reason = [
         'accessexception',
         'webservice_access_exception',
@@ -76,17 +94,47 @@ export function moodleReader(token, request = fetch, readAudience) {
     });
   }
 
-  async function catalog() {
-    const result = await read('mod_assign_get_assignments', { 'courseids[0]': String(courseId) });
-    const course = list(result.courses).find((c) => c.id === courseId);
+  async function searchCourses(cycle) {
+    const result = await read('core_course_search_courses', {
+      criterianame: 'search',
+      criteriavalue: cycle,
+      perpage: '0',
+    });
+    const courses = list(result.courses);
     if (
-      !course ||
-      !/^603\.\s*fundamentos de contabilidad\s+27-1$/iu.test(course.fullname?.trim())
-    ) {
-      throw new Error('El curso visible no coincide con el curso y ciclo del piloto.');
-    }
+      result.total !== courses.length ||
+      courses.some(
+        (c) => !Number.isSafeInteger(c?.id) || c.id < 1 || typeof c.fullname !== 'string',
+      ) ||
+      new Set(courses.map((c) => c.id)).size !== courses.length
+    )
+      throw invalid();
+    return courses.map(({ id, fullname }) => ({ id, fullname }));
+  }
+
+  async function catalog(link) {
+    const courseId = link?.courseId;
+    if (!Number.isSafeInteger(courseId) || courseId < 1)
+      throw new Error('El curso requiere un vínculo válido.');
+    // Moodle 4.5 can omit individual modules from an otherwise accessible course.
+    const restrictedModule = (w) =>
+      w?.item === 'module' &&
+      String(w.warningcode) === '1' &&
+      Number.isSafeInteger(w.itemid) &&
+      w.itemid > 0;
+    const result = await read(
+      'mod_assign_get_assignments',
+      { 'courseids[0]': String(courseId) },
+      restrictedModule,
+    );
+    const course = list(result.courses).find((c) => c.id === courseId);
+    if (!course) throw accessPending();
+    if (typeof course.fullname !== 'string' || (link.fullname && course.fullname !== link.fullname))
+      throw new Error('El curso cambió desde la vinculación. Revisa la versión SPAI en Insumos.');
+    const restricted = new Set((result.warnings ?? []).map((w) => w.itemid));
     const activities = list(course.assignments).map((a) => {
       if (!Number.isSafeInteger(a.id) || !Number.isSafeInteger(a.cmid) || !a.name) throw invalid();
+      if (restricted.has(a.cmid)) throw invalid();
       return {
         id: a.id,
         cmid: a.cmid,
@@ -98,11 +146,21 @@ export function moodleReader(token, request = fetch, readAudience) {
           a.grade > 0,
       };
     });
-    return { course: course.fullname, courseId, activities };
+    if (restricted.size && !activities.length)
+      throw new Error(
+        'Curso localizado · acceso a entregas pendiente. Moodle devolvió el curso, pero omitió sus tareas por restricciones de acceso. Comprueba la visibilidad de la sección y el permiso mod/assign:view de la cuenta técnica en la actividad.',
+      );
+    return {
+      course: course.fullname,
+      courseId,
+      activities,
+      hasRestrictedActivities: restricted.size > 0,
+    };
   }
 
-  async function snapshot(id) {
-    const context = await catalog();
+  async function snapshot(id, link) {
+    const context = await catalog(link);
+    const { courseId } = context;
     const activity = context.activities.find((a) => a.id === id);
     if (!activity?.supported)
       throw new Error('Esta actividad no admite el seguimiento individual del piloto.');
@@ -139,7 +197,15 @@ export function moodleReader(token, request = fetch, readAudience) {
         site,
         activeUserIds,
       });
-      audience = verifiedAudience(rows, submissions, site, activity, evidence, activeUserIds);
+      audience = verifiedAudience(
+        rows,
+        submissions,
+        site,
+        activity,
+        evidence,
+        activeUserIds,
+        courseId,
+      );
     } catch {
       audience = {
         reason: 'No se pudo verificar la tabla de participantes de la tarea o su cotejo local.',
@@ -160,14 +226,15 @@ export function moodleReader(token, request = fetch, readAudience) {
     }
     return {
       course: context.course,
+      courseId,
       activity,
       ...result,
       readAt: new Date().toISOString(),
     };
   }
-  async function probeDueDates(id, userId) {
+  async function probeDueDates(id, userId, link) {
     const site = await siteInfo();
-    const activity = (await catalog()).activities.find((a) => a.id === id && a.supported);
+    const activity = (await catalog(link)).activities.find((a) => a.id === id && a.supported);
     if (!activity) throw new Error('Selecciona una tarea individual del catálogo del piloto.');
     const functions = ['mod_assign_get_participant', 'mod_assign_get_user_flags'].map((name) => [
       name,
@@ -178,7 +245,7 @@ export function moodleReader(token, request = fetch, readAudience) {
         : 'sin información',
     ]);
     if (userId === undefined) {
-      const result = await snapshot(id);
+      const result = await snapshot(id, link);
       const missing = result.students.filter((row) => row.state === 'sin-entrega');
       if (result.expectedCount !== null)
         return {
@@ -226,7 +293,7 @@ export function moodleReader(token, request = fetch, readAudience) {
       confirmed: dates.get(userId) != null ? 1 : 0,
     };
   }
-  return { catalog, snapshot, siteInfo, participants, probeDueDates };
+  return { searchCourses, catalog, snapshot, siteInfo, participants, probeDueDates };
 }
 
 function latestByUser(rows) {
@@ -247,7 +314,7 @@ function latestByUser(rows) {
 }
 
 // La tabla visible puede omitir grupos o incluir personas ajenas a una restricción.
-function verifiedAudience(rows, submissions, site, activity, evidence, activeUserIds) {
+function verifiedAudience(rows, submissions, site, activity, evidence, activeUserIds, courseId) {
   if (!Array.isArray(rows)) throw invalid();
   if (
     !evidence ||

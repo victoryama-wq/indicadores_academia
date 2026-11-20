@@ -57,6 +57,8 @@ export function populationSample(type: 'saeko' | 'spai', cycle: string): InputBa
       cicloOrigen: c,
       numero,
       materia,
+      modalidad: i === 1 ? 'Virtual' : 'Escolarizada',
+      docente: 'Docente ficticio ' + (i + 1),
       carrera,
       grupo: `${c} ${grupo}`,
       comparte: comparte ? `${c} ${comparte}` : '',

@@ -124,4 +124,4 @@ Próximamente: reportes institucionales definitivos y descarga, formatos reales 
 
 ## Piloto local de lectura Moodle
 
-Sistemas puede consultar las tareas de Fundamentos de Contabilidad 27-1 y abrir el listado de estudiantes de cada indicador. La [guía de arranque y verificación](docs/MOODLE-LECTURA-PILOTO.md) incluye las instrucciones para PowerShell y el alcance de la población.
+Sistemas activa las imparticiones de SPAI desde Insumos por ciclo, revisa las coincidencias con el catálogo Moodle y abre una asignatura vinculada para consultar sus tareas e indicadores. La [guía de arranque y verificación](docs/MOODLE-LECTURA-PILOTO.md) incluye las instrucciones para PowerShell y el alcance de la población.

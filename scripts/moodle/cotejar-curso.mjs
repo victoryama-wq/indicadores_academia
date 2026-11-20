@@ -6,8 +6,17 @@ import { pathToFileURL } from 'node:url';
 import { moodleReader } from './reader.mjs';
 
 // Usar solamente cuando Sistemas ha verificado que la actividad corresponde a todo el curso.
-export async function cotejarCurso(token, assignmentId, reportedSize, validUntil, request = fetch) {
+export async function cotejarCurso(
+  token,
+  assignmentId,
+  reportedSize,
+  validUntil,
+  courseId,
+  request = fetch,
+) {
   if (
+    !Number.isSafeInteger(courseId) ||
+    courseId < 1 ||
     !Number.isSafeInteger(assignmentId) ||
     assignmentId < 1 ||
     !Number.isSafeInteger(reportedSize) ||
@@ -15,7 +24,7 @@ export async function cotejarCurso(token, assignmentId, reportedSize, validUntil
     !(Date.parse(validUntil) > Date.now())
   )
     throw new Error(
-      'Revisa la tarea, el total independiente de estudiantes y la fecha de vigencia.',
+      'Revisa el ID del curso, la tarea, el total independiente de estudiantes y la fecha de vigencia.',
     );
   let evidence;
   const reader = moodleReader(token, request, ({ courseId, activity, site, activeUserIds }) => {
@@ -33,7 +42,7 @@ export async function cotejarCurso(token, assignmentId, reportedSize, validUntil
     };
     return evidence;
   });
-  const snapshot = await reader.snapshot(assignmentId);
+  const snapshot = await reader.snapshot(assignmentId, { courseId });
   if (!evidence || snapshot.expectedCount !== reportedSize)
     throw new Error(
       'Cotejo incompleto. ' +
@@ -46,7 +55,7 @@ export async function cotejarCurso(token, assignmentId, reportedSize, validUntil
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   try {
-    const [assignment, size, until] = process.argv.slice(2);
+    const [assignment, size, until, course] = process.argv.slice(2);
     const token = (await text(process.stdin)).trim();
     if (!token) throw new Error('Introduce el token en el aviso local de PowerShell.');
     const { evidence, snapshot } = await cotejarCurso(
@@ -54,6 +63,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
       Number(assignment),
       Number(size),
       until,
+      Number(course),
     );
     const target =
       process.env.MOODLE_COBERTURA_LOCAL || join(process.env.LOCALAPPDATA, 'cotejo-moodle.json');

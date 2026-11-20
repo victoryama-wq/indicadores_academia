@@ -4,6 +4,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { courseLinkRoutes } from './course-links.mjs';
 import { moodleReader } from './reader.mjs';
 
 const origin = 'http://127.0.0.1:4380';
@@ -26,6 +27,7 @@ function sameKey(received, key) {
 }
 
 export function pilotServer(reader, key) {
+  const links = courseLinkRoutes(reader);
   return createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -41,21 +43,17 @@ export function pilotServer(reader, key) {
       (req.headers.origin && req.headers.origin !== 'http://' + host)
     )
       return json(403, { error: 'Origen local requerido.' });
-    if (req.method !== 'GET') return json(405, { error: 'Método no disponible.' });
     const path = req.url.split('?')[0];
     if (path.startsWith('/api/')) {
       if (!sameKey(req.headers.authorization, key))
         return json(401, { error: 'La clave local del piloto es incorrecta.' });
       try {
-        if (path === '/api/moodle/actividades') return json(200, await reader.catalog());
-        const match = /^\/api\/moodle\/actividades\/(\d+)$/.exec(path);
-        if (match) return json(200, await reader.snapshot(Number(match[1])));
-        return json(404, { error: 'Consulta fuera del piloto.' });
+        return await links(req, path, json);
       } catch (error) {
         return json(502, {
           error:
             error instanceof Error &&
-            /^(Moodle |No se pudo |Consulta incompleta |El curso |Esta actividad |Ningún participante )/u.test(
+            /^(Curso localizado |Moodle |No se pudo |Consulta incompleta |El curso |Esta actividad |Ningún participante )/u.test(
               error.message,
             )
               ? error.message
@@ -63,6 +61,7 @@ export function pilotServer(reader, key) {
         });
       }
     }
+    if (req.method !== 'GET') return json(405, { error: 'Método no disponible.' });
     if (!/^\/(?:[\w.-]+\/)*[\w.-]*$/.test(path) || path.split('/').some((p) => p.startsWith('.')))
       return json(404, { error: 'Ruta desconocida.' });
     const file = extname(path) ? path.slice(1) : 'index.html';
@@ -101,12 +100,15 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   );
   const probe = process.argv.indexOf('--comprobar-participantes');
   const dateProbe = process.argv.indexOf('--comprobar-fechas');
+  const courseArg = process.argv.indexOf('--curso');
+  const link = { courseId: courseArg < 0 ? null : Number(process.argv[courseArg + 1]) };
   if (dateProbe !== -1) {
     try {
       const user = process.argv[dateProbe + 2];
       const result = await reader.probeDueDates(
         Number(process.argv[dateProbe + 1]),
-        user ? Number(user) : undefined,
+        user && !user.startsWith('--') ? Number(user) : undefined,
+        link,
       );
       for (const [name, status] of result.functions)
         console.log('Función', name, '| anunciada:', status);
@@ -143,7 +145,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
       process.exitCode = 1;
     }
     try {
-      const context = await reader.catalog();
+      const context = await reader.catalog(link);
       const activity = context.activities.find((a) => a.id === assignmentId && a.supported);
       if (!activity) throw new Error('Selecciona una tarea individual del catálogo del piloto.');
       console.log('Curso:', context.courseId, '| tarea:', activity.id, '| módulo:', activity.cmid);
@@ -179,7 +181,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
         process.exitCode = 1;
       })
       .listen(4380, '127.0.0.1', () => {
-        console.log('Abre ' + origin + '/reportes');
+        console.log('Abre ' + origin + '/reportes y selecciona Sistemas → Insumos por ciclo');
         console.log('Clave local de esta ejecución: ' + key);
       });
   }

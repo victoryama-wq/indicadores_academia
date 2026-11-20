@@ -183,4 +183,48 @@ describe('Población activa Saeko × imparticiones SPAI', () => {
     expect(x.batch?.filas[0]).toMatchObject({ matricula: ' tuP001 ', hoja: s.sheet, fila: 2 });
     expect(parsePopulationSheets([s], 'saeko', 'p02').batch).toBeNull();
   });
+  it('conserva modalidad, docente y grupos de cada impartición desde XLSX', () => {
+    const table = {
+      sheet: 'SPAI demo',
+      data: [
+        ['Ciclo', '27-1'],
+        [
+          'ID Moodle',
+          'Materia',
+          'Carrera',
+          'Grupo base',
+          'Comparte con',
+          'Matrícula(s)',
+          'Modalidad',
+          'Docente',
+        ],
+        [
+          '603.',
+          'Materia ficticia',
+          'CONPUB',
+          'Grupo A',
+          'Grupo B',
+          '',
+          'Virtual',
+          'Docente demo A',
+        ],
+        [
+          '603.',
+          'Materia ficticia',
+          'CONPUB',
+          'Grupo A',
+          'Grupo C',
+          '',
+          'Ejecutiva',
+          'Docente demo B',
+        ],
+      ],
+    };
+    const { batch, errors } = parsePopulationSheets([table], 'spai', 'p01');
+    expect(errors).toEqual([]);
+    expect(batch?.tipo === 'spai' && batch.imparticiones).toMatchObject([
+      { grupo: 'Grupo A', comparte: 'Grupo B', modalidad: 'Virtual', docente: 'Docente demo A' },
+      { grupo: 'Grupo A', comparte: 'Grupo C', modalidad: 'Ejecutiva', docente: 'Docente demo B' },
+    ]);
+  });
 });
