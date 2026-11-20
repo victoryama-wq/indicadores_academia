@@ -1,0 +1,9 @@
+{
+  "targets": {
+    "indicadores-academia": {
+      "hosting": {
+        "vista-sistemas": ["indicadores-academia"]
+      }
+    }
+  }
+}

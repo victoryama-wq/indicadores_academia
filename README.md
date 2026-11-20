@@ -125,3 +125,5 @@ Próximamente: reportes institucionales definitivos y descarga, formatos reales 
 ## Piloto local de lectura Moodle
 
 Sistemas activa las imparticiones de SPAI desde Insumos por ciclo, revisa las coincidencias con el catálogo Moodle y abre una asignatura vinculada para consultar sus tareas e indicadores. La [guía de arranque y verificación](docs/MOODLE-LECTURA-PILOTO.md) incluye las instrucciones para PowerShell y el alcance de la población.
+
+La [guía de la vista de Coordinación para Sistemas](docs/VISTA-FIREBASE.md) describe las pruebas locales, el reemplazo previsto de Seguimiento académico en `indicadores-academia.web.app` y la restauración de su versión anterior.
