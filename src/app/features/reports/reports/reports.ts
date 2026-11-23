@@ -164,27 +164,30 @@ export class Reports {
   readonly selection = computed(() => {
     const params = this.nav.params();
     const requested = params['filaReporte'];
+    const course =
+      params['cursoDetalle'] ??
+      (this.nav.context().asignatura === 'todas' ? null : this.nav.context().asignatura);
+    const matchesActivity = (a: CalendarRow) =>
+      a.actividadId === params['actividadDetalle'] && (!course || a.cursoId === course);
+    if (!requested) {
+      if (!params['actividadDetalle'] || this.nav.context().corte !== 'c01' || this.population())
+        return null;
+      const matches = this.consultable().filter(matchesActivity);
+      if (matches.length !== 1) return null;
+      const [activity] = matches;
+      const item = { activity, rows: activity.rows, count: activity.students };
+      return { row: null, key: null, items: [item], item };
+    }
     const row =
-      requested === 'resumen' || (!requested && params['actividadDetalle'])
-        ? this.global()
-        : this.rows().find((r) => r.id === requested);
+      requested === 'resumen' ? this.global() : this.rows().find((r) => r.id === requested);
     if (!row || !row.records.length) return null;
     const key: Indicator = Object.hasOwn(indicators, params['indicador'])
       ? params['indicador']
       : 'personas';
     const items = contributions(this.consultable(), row, key);
     if (!items.length) return null;
-    const course =
-      params['cursoDetalle'] ??
-      (this.nav.context().asignatura === 'todas' ? null : this.nav.context().asignatura);
-    const chosen = items.filter(
-      (i) =>
-        i.activity.actividadId === params['actividadDetalle'] &&
-        (!course || i.activity.cursoId === course),
-    );
-    const item =
-      chosen.length === 1 ? chosen[0] : requested && items.length === 1 ? items[0] : undefined;
-    if (!requested && !item) return null;
+    const chosen = items.filter((i) => matchesActivity(i.activity));
+    const item = chosen.length === 1 ? chosen[0] : items.length === 1 ? items[0] : undefined;
     return { row, key, items, item };
   });
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -234,11 +237,10 @@ export class Reports {
       }
       const fragment = this.router.parseUrl(this.router.url).fragment;
       if (!selected && (fragment?.startsWith('resultado-') || fragment?.startsWith('fuente-'))) {
-        const origin = document.getElementById(fragment);
-        const target = origin?.closest('details:not([open])')
-          ? document.getElementById('breakdown-heading')
-          : origin;
+        const target = document.getElementById(fragment);
         if (target && this.el.nativeElement.contains(target)) {
+          const sources = target.closest('details');
+          if (sources) sources.open = true;
           target.focus({ preventScroll: true });
           const returnY = window.history.state?.reportReturnY;
           if (Number.isFinite(returnY)) window.scrollTo({ top: returnY, behavior: 'instant' });
@@ -286,10 +288,9 @@ export class Reports {
     const selected = this.selection();
     if (!selected) return;
     void this.nav.updateReportDetail(this.clearSelection, {
-      fragment:
-        !this.nav.params()['filaReporte'] && selected.item
-          ? 'fuente-' + selected.item.activity.cursoId + '-' + selected.item.activity.actividadId
-          : 'resultado-' + selected.row.id + '-' + selected.key,
+      fragment: selected.row
+        ? 'resultado-' + selected.row.id + '-' + selected.key
+        : 'fuente-' + selected.item.activity.cursoId + '-' + selected.item.activity.actividadId,
     });
   }
   focusBreakdown() {

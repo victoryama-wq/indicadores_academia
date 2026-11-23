@@ -424,6 +424,65 @@ test('la franja, el filtro y el desglose comparten el grupo del enlace directo',
   await checkGroup('g01', 'ENF-301', 'Docente Demo A');
 });
 
+for (const scenario of [
+  {
+    query: 'estudiantes',
+    activity: 'Balance inicial',
+    group: 'ADM-102',
+    course: 'rep-contabilidad',
+    id: 'balance-u01',
+    graded: 18,
+    received: 20,
+    progress: 90,
+  },
+  {
+    query: 'docentes',
+    activity: 'Proceso administrativo',
+    group: 'ADM-201',
+    course: 'i04',
+    id: 'a05',
+    graded: 2,
+    received: 2,
+    progress: 100,
+  },
+]) {
+  test('el calendario abre ' + scenario.activity + ' desde ' + scenario.query, async ({ page }) => {
+    await page.goto('/reportes?reporte=' + scenario.query);
+    if (scenario.query === 'docentes') {
+      const table = page.getByRole('table', { name: 'Docentes con pendientes' });
+      await expect(table).toBeVisible();
+      await expect(table).not.toContainText('Docente Demo C');
+    }
+    await page.getByText('Fuentes y criterios', { exact: true }).click();
+    const card = page.getByRole('article').filter({
+      has: page.getByRole('heading', { name: scenario.activity, exact: true }),
+    });
+    const origin = card.getByRole('button', { name: 'Consultar actividad' });
+    await origin.click();
+    const detail = page.getByRole('region', { name: 'Seguimiento de tareas' });
+    const checkDetail = async () => {
+      await expect(detail.getByText(scenario.activity, { exact: true })).toBeVisible();
+      await expect(detail).toContainText(scenario.group);
+      await expect(detail).toContainText(
+        scenario.graded + ' de ' + scenario.received + ' entregas calificadas',
+      );
+      await expect(detail.getByText(scenario.progress + '%', { exact: true })).toBeVisible();
+      await expect(page).toHaveURL(
+        (url) =>
+          url.searchParams.get('cursoDetalle') === scenario.course &&
+          url.searchParams.get('actividadDetalle') === scenario.id &&
+          url.searchParams.get('reporte') === scenario.query,
+      );
+    };
+    await checkDetail();
+    await page.reload();
+    await checkDetail();
+    await detail.getByRole('button', { name: /Volver/ }).click();
+    await expect(detail).toHaveCount(0);
+    await expect(origin).toBeFocused();
+  });
+}
+
 test('desde el desglose, el detalle conserva filtros y corte hasta cambiar de ciclo', async ({
   page,
 }) => {
@@ -438,6 +497,7 @@ test('desde el desglose, el detalle conserva filtros y corte hasta cambiar de ci
   const detail = page.getByRole('region', { name: 'Seguimiento de tareas' });
   await expect(detail.getByRole('heading', { name: 'Pendientes de calificar' })).toBeFocused();
   await expect(detail.getByRole('listitem')).toHaveCount(2);
+  await expect(detail.getByRole('listitem')).toContainText(['DEMO-C19', 'DEMO-C20']);
   await detail.getByRole('button', { name: '4 Sin entrega' }).click();
   await page.reload();
   await expect(detail.getByRole('listitem')).toHaveCount(4);

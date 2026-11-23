@@ -34,7 +34,7 @@ const states = [
 export class TaskTracking {
   readonly items = input.required<readonly Contribution[]>();
   readonly activity = input.required<Contribution | undefined>();
-  readonly indicator = input.required<Indicator>();
+  readonly indicator = input.required<Indicator | null>();
   readonly label = input.required<string>();
   readonly person = input(false);
   readonly back = output<void>();

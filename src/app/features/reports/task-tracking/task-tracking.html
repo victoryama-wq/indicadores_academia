@@ -7,7 +7,8 @@
     <span class="pill">Datos simulados</span>
   </header>
   <button type="button" mat-button (click)="back.emit()">
-    <app-ui-icon name="arrowLeft" /> Volver al desglose
+    <app-ui-icon name="arrowLeft" />
+    {{ indicator() === null ? 'Volver al calendario' : 'Volver al desglose' }}
   </button>
   @if (items().length > 1) {
     <h3 id="contribution-heading" tabindex="-1">Actividades que aportan al indicador</h3>

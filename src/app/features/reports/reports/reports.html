@@ -168,7 +168,7 @@
           </button>
         }
       </div>
-      @if (selection()?.row?.id === 'resumen') {
+      @if (selection()?.row === null || selection()?.row?.id === 'resumen') {
         <ng-container *ngTemplateOutlet="detail" />
       }
       @if (view() === 'entregas') {
@@ -435,8 +435,8 @@
       [items]="sel.items"
       [activity]="sel.item"
       [indicator]="sel.key"
-      [label]="sel.row.label + ' · ' + titles[sel.key]"
-      [person]="view() === 'estudiantes'"
+      [label]="sel.row ? sel.row.label + ' · ' + titles[sel.key] : 'Calendario de actividades'"
+      [person]="sel.row !== null && view() === 'estudiantes'"
       [cut]="cut()"
       (back)="close()"
       (choose)="choose($event)"
