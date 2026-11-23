@@ -1,3 +1,5 @@
+import { contributions, indicatorCount, resultRows } from './report-breakdown';
+import { moodleDelay } from '../../features/reports/moodle/moodle-delay';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { firstValueFrom, of } from 'rxjs';
@@ -90,6 +92,34 @@ describe('Consultas por ciclo y unidades de conteo', () => {
   beforeAll(async () => {
     batches = seedBatches(await firstValueFrom(new DemoData().query(TEACHER_CONTEXT)));
   });
+  it('desglosa el indicador por actividad y conserva las personas únicas entre imparticiones', () => {
+    const report = selectReport(batches, TEACHER_CONTEXT);
+    const teachers = resultRows(report, 'docentes');
+    const many = contributions(
+      report.activities,
+      teachers.find((t) => t.id === 'docente-d04')!,
+      'pendiente',
+    );
+    expect(many.map((c) => c.count)).toEqual([1, 1, 1, 1, 1, 1]);
+    const pairs = many.flatMap((c) =>
+      c.rows
+        .filter((r) => r.state === 'pendiente')
+        .map((r) => [r.calendar.cursoId, r.calendar.actividadId, r.student.estudianteId].join(':')),
+    );
+    expect(new Set(pairs).size).toBe(6);
+    const students = resultRows(report, 'estudiantes');
+    expect(students).toHaveLength(24);
+    const repeated = students.find((s) => s.id === 'estudiante-rep-e01')!;
+    expect(indicatorCount(repeated.records, 'personas')).toBe(1);
+    expect(contributions(report.activities, repeated, 'calificada')).toHaveLength(2);
+  });
+  it('calcula días, horas y minutos de Balance inicial al corte sin modificar el formato del lector', () => {
+    const cut = reportCut('p01');
+    const due = Date.parse('2026-11-05T18:00:00-05:00') / 1000;
+    expect(moodleDelay(due, cut, 'minutos')).toBe('1 día 5 horas 59 minutos de atraso');
+    expect(moodleDelay(null, cut, 'minutos')).toBe('Atraso por confirmar');
+    expect(moodleDelay(due, cut)).toBe('1 día 5 horas de atraso');
+  });
   it.each(['ejecutiva', 'virtual', 'posgrados'])(
     'respeta apertura y cierre exacto de %s sin usar el recordatorio',
     (modalidad) => {
@@ -157,11 +187,11 @@ describe('Consultas por ciclo y unidades de conteo', () => {
     });
     const all = selectReport(batches, TEACHER_CONTEXT);
     expect(all.counts).toMatchObject({
-      students: 38,
-      pairs: 54,
-      graded: 31,
-      pending: 17,
-      missing: 6,
+      students: 62,
+      pairs: 78,
+      graded: 49,
+      pending: 19,
+      missing: 10,
     });
     expect(all.students).toHaveLength(24);
     expect(all.students.find((s) => s.estudianteId === 'rep-e01')?.tasks).toBe(2);
@@ -171,6 +201,64 @@ describe('Consultas por ciclo y unidades de conteo', () => {
       pending: 6,
     });
     expect(all.teachers.some((t) => t.id === 'd03')).toBe(false);
+  });
+  it('reconcilia el detalle con el resumen, incluida la nota cero y los identificadores ficticios', () => {
+    const result = selectReport(batches, { ...TEACHER_CONTEXT, asignatura: 'rep-contabilidad' });
+    const [activity] = result.activities;
+    expect(activity).toMatchObject({
+      confirmed: true,
+      recipients: 24,
+      graded: 18,
+      pending: 2,
+      missing: 4,
+      unknown: 0,
+      progress: 90,
+    });
+    expect(activity.rows).toEqual(result.records);
+    expect(
+      activity.rows.filter((r) => r.state === 'sin-entrega').map((r) => r.student.matricula),
+    ).toEqual(['DEMO-C21', 'DEMO-C22', 'DEMO-C23', 'DEMO-C24']);
+    expect(activity.rows.find((r) => r.grade === 0)?.state).toBe('calificada');
+    const all = selectReport(batches, TEACHER_CONTEXT);
+    expect(all.activities.reduce((n, a) => n + a.pending, 0)).toBe(all.counts.pending);
+  });
+  it('conserva al destinatario sin fecha y separa un borrador al corte de los faltantes', () => {
+    const changed = batches.map((b) =>
+      b.tipo !== 'calificaciones'
+        ? b
+        : {
+            ...b,
+            filas: b.filas.map((row) => {
+              if (row.estudianteId === 'cont-24') return { ...row, fechaEfectiva: undefined };
+              if (row.estudianteId === 'cont-23')
+                return { ...row, borradorEn: '2026-11-06T08:00:00-05:00' };
+              return row;
+            }),
+          },
+    );
+    const [a] = selectReport(changed, {
+      ...TEACHER_CONTEXT,
+      asignatura: 'rep-contabilidad',
+    }).activities;
+    expect(a).toMatchObject({ confirmed: true, missing: 3, pending: 2, graded: 18 });
+    expect(a.rows.find((r) => r.student.estudianteId === 'cont-24')).toMatchObject({
+      state: 'sin-entrega',
+      effectiveDue: null,
+    });
+    expect(a.rows.find((r) => r.student.estudianteId === 'cont-23')?.state).toBe('borrador');
+  });
+  it('la falta de evidencia de un alumno impide confirmar la población aun con filtro de entregas', () => {
+    const incomplete = batches.map((b) =>
+      b.tipo !== 'calificaciones'
+        ? b
+        : { ...b, filas: b.filas.filter((r) => r.estudianteId !== 'cont-24') },
+    );
+    const result = selectReport(
+      incomplete,
+      { ...TEACHER_CONTEXT, asignatura: 'rep-contabilidad' },
+      'en-tiempo',
+    );
+    expect(result.activities[0]).toMatchObject({ confirmed: false, graded: 18, pending: 2 });
   });
   it('filtra tipo, unidad, modalidad y entregas extemporáneas sin mezclar docentes', () => {
     const result = selectReport(

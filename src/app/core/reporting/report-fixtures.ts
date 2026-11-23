@@ -107,6 +107,7 @@ export function seedBatches(snapshot: Snapshot): InputBatch[] {
       modalidad: g.modalityId,
       docenteId: s.teacherId,
       docente: s.teacher,
+      cursoCompleto: true,
       actividadId: a.id,
       actividad: a.name,
       entrega: a.dueAt,
@@ -132,6 +133,7 @@ export function seedBatches(snapshot: Snapshot): InputBatch[] {
       cursoId: a.cursoId,
       actividadId: r.activityId,
       estudianteId: r.studentId,
+      ...(a.entrega ? { fechaEfectiva: a.entrega } : {}),
       entregaEn: r.submittedAt,
       calificacion: r.grade,
       calificadaEn: r.grade !== null ? '2026-11-04T12:00:00-05:00' : null,
@@ -180,6 +182,47 @@ export function seedBatches(snapshot: Snapshot): InputBatch[] {
         });
       }
     }
+  }
+  const accounting: CalendarRow = {
+    ...demoCalendar('p01', 'rep-contabilidad'),
+    grupoId: 'rep-adm102',
+    grupo: 'ADM-102',
+    modalidad: 'escolarizada',
+    docenteId: 'd05',
+    docente: 'Docente Demo E',
+    asignatura: 'Contabilidad aplicada',
+    actividadId: 'balance-u01',
+    actividad: 'Balance inicial',
+    tipo: 'integradora',
+    cursoCompleto: true,
+    entrega: '2026-11-05T18:00:00-05:00',
+    corte: '2026-11-06T23:59:00-05:00',
+    pesoTarea: 0,
+    pesoIntegradora: 100,
+    pesoForo: 0,
+    pesoExamen: 0,
+  };
+  calendar.push(accounting);
+  for (let number = 1; number <= 24; number++) {
+    const suffix = String(number).padStart(2, '0');
+    const id = 'cont-' + suffix;
+    enrollments.set(accounting.cursoId + ':' + id, {
+      ciclo: 'p01',
+      cursoId: accounting.cursoId,
+      estudianteId: id,
+      estudiante: 'Estudiante Demo C' + suffix,
+      matricula: 'DEMO-C' + suffix,
+    });
+    grades.push({
+      ciclo: 'p01',
+      cursoId: accounting.cursoId,
+      actividadId: accounting.actividadId,
+      estudianteId: id,
+      fechaEfectiva: accounting.entrega!,
+      entregaEn: number <= 20 ? '2026-11-04T14:00:00-05:00' : null,
+      calificacion: number <= 18 ? (number === 1 ? 0 : 85) : null,
+      calificadaEn: number <= 18 ? '2026-11-05T10:00:00-05:00' : null,
+    });
   }
   calendar.push({
     ...demoCalendar('p01', 'rep-prop'),

@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { NavigationEnd, Params, Router } from '@angular/router';
+import { NavigationEnd, NavigationExtras, Params, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 import {
@@ -16,6 +16,8 @@ declare const ACADEMIA_VISTA_COORDINACION: boolean;
 @Injectable({ providedIn: 'root' })
 export class NavigationContext {
   private readonly router = inject(Router);
+  readonly reportScopeOpen = signal(matchMedia('(min-width: 1024px)').matches);
+  readonly reportMoreOpen = signal(false);
   readonly params = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),
@@ -107,9 +109,45 @@ export class NavigationContext {
       ...extra,
     });
   }
-  update(extra: Params) {
+  updateReportDetail(
+    extra: Params,
+    options: { fragment?: string; fromResult?: boolean; replaceUrl?: boolean } = {},
+  ) {
+    const reportReturnY = options.fromResult ? window.scrollY : window.history.state?.reportReturnY;
+    return this.update(extra, {
+      scroll: 'manual',
+      fragment: options.fragment,
+      replaceUrl: options.replaceUrl,
+      state: { reportReturnY },
+    });
+  }
+  update(
+    extra: Params,
+    options: Pick<NavigationExtras, 'scroll' | 'fragment' | 'replaceUrl' | 'state'> = {},
+  ) {
+    const filtersChanged =
+      this.router.url.split('?')[0] === '/reportes' &&
+      Object.keys(extra).some(
+        (key) =>
+          (key === 'periodo' || key === 'corte') &&
+          extra[key] !== (this.params()[key] ?? this.context()[key as keyof QueryContext]),
+      );
     return this.router.navigate([], {
-      queryParams: { ...this.params(), ...this.context(), ...extra },
+      ...options,
+      queryParams: {
+        ...this.params(),
+        ...this.context(),
+        ...(filtersChanged
+          ? {
+              filaReporte: null,
+              indicador: null,
+              cursoDetalle: null,
+              actividadDetalle: null,
+              listaDetalle: null,
+            }
+          : {}),
+        ...extra,
+      },
     });
   }
   setProfile(profile: Profile) {

@@ -43,6 +43,7 @@ export interface CalendarRow {
   corte: string | null;
   recordarmeCalificar: string | null;
   propedeutico: boolean;
+  cursoCompleto?: boolean;
   pesoTarea: number | null;
   pesoIntegradora: number | null;
   pesoForo: number | null;
@@ -69,6 +70,8 @@ export interface GradeRow {
   entregaEn: string | null;
   calificacion: number | null;
   calificadaEn: string | null;
+  fechaEfectiva?: string;
+  borradorEn?: string;
 }
 export interface InputRows {
   saeko: RosterRow;
@@ -118,7 +121,8 @@ export const LATE_LABELS: Record<LateState, string> = {
 export interface ReportRecord {
   calendar: CalendarRow;
   student: EnrollmentRow;
-  state: 'calificada' | 'pendiente' | 'sin-entrega' | 'sin-datos';
+  state: 'calificada' | 'pendiente' | 'sin-entrega' | 'sin-datos' | 'borrador';
+  effectiveDue: string | null;
   late: LateState;
   grade: number | null;
   submittedAt: string | null;

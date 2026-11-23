@@ -1,7 +1,7 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, Signal, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
-import { ACADEMIC_DATA, countRecords, Snapshot } from './models';
+import { ACADEMIC_DATA, AcademicCatalog, countRecords, Snapshot } from './models';
 import { NavigationContext } from './navigation-context';
 
 interface QueryResult {
@@ -28,6 +28,14 @@ export class QueryStore {
     { initialValue: { status: 'loading', snapshot: null } as QueryResult },
   );
   readonly data = computed(() => this.result().snapshot);
+  private readonly pageCatalog = signal<Signal<AcademicCatalog> | null>(null);
+  readonly catalog = computed(() => this.pageCatalog()?.() ?? this.data()?.catalog);
+  usePageCatalog(catalog: Signal<AcademicCatalog>, owner: DestroyRef) {
+    this.pageCatalog.set(catalog);
+    owner.onDestroy(() => {
+      if (this.pageCatalog() === catalog) this.pageCatalog.set(null);
+    });
+  }
   readonly counts = computed(() => countRecords(this.data()?.records ?? []));
   reload() {
     this.retry.update((v) => v + 1);

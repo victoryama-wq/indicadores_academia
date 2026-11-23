@@ -33,10 +33,19 @@ El calendario solo permite revisar fechas, actividades y pesos. Hasta contar con
 
 ### Conjuntos reproducibles
 
-- `p01` (27-1, ciclo en operación de la demo): fecha de consulta fija **2026-11-06 23:59 -05:00**. Reportes: **38 estudiantes únicos, 54 pares, 31 calificadas, 17 pendientes y 6 sin entrega**. Consulta de tarea calificada: **24 personas**. Dos estudiantes se comparten entre tres cursos de Ejecutiva, Virtual y Posgrados; el docente D tiene 6 calificadas y 6 pendientes.
+- `p01` (27-1, ciclo en operación de la demo): fecha de consulta fija **2026-11-06 23:59 -05:00**. Reportes: **62 estudiantes únicos, 78 pares, 49 calificadas, 19 pendientes y 10 sin entrega**. Consulta de tarea calificada: **24 personas**. Dos estudiantes se comparten entre tres cursos de Ejecutiva, Virtual y Posgrados; el docente D tiene 6 calificadas y 6 pendientes.
 - Los cursos originales no cambian: Docentes mantiene 36 personas/42 pares; ENF-301 conserva 30 personas, 18 calificadas y **6 pendientes: 4 vencidos y 2 en plazo**. Las entregas extemporáneas de Reportes son un concepto distinto de los pendientes de calificación vencidos del recorrido original.
 - `p02` (27-2, preparación): sin insumos iniciales; fecha de consulta fija **2027-03-06 23:59 -05:00**. Las cuatro plantillas contienen un curso y una persona. Calendario + SPAI + libro producen una entrega calificada con **cero**. Activar además la baja de ejemplo excluye ese par y deja cero resultados.
 - El reloj actual solo etiqueta el momento de activación, nunca determina los conteos.
+
+### Seguimiento de tareas en Reportes
+
+1. Abre `/reportes` con Coordinación. Usa el ciclo 27-1 y **Restablecer filtros** si llegaste desde otro grupo.
+2. Selecciona **Docentes con pendientes** y abre los **2** pendientes de **Docente Demo E**. El desglose abre directamente las dos filas de **Balance inicial**, **Contabilidad aplicada · ADM-102**. Para un docente con varias actividades, elige la actividad a partir de su aportación al total.
+3. En el corte del **6 de noviembre de 2026 a las 23:59 de Cancún** hay 24 destinatarios. Las 18 entregas calificadas incluyen una nota de cero. Las dos pendientes completan el denominador de 20 y el avance es **90 %**. **Pendientes de calificar** abre DEMO-C19 y DEMO-C20. **Sin entrega** abre DEMO-C21 a DEMO-C24 con fecha efectiva del 5 de noviembre a las 18:00 y atraso de 1 día 5 horas 59 minutos. Borradores y Por revisar tienen cero filas.
+4. Prueba **Volver al desglose**, Atrás y recarga. La URL identifica los filtros, la actividad y la lista abierta. El grupo **ENF-301** ofrece **Plan de cuidados** con 18 calificadas de 24 recibidas y **75 %** de avance.
+
+Los selectores usan los registros del reporte al corte y la clasificación de extemporáneas elegida. El total de destinatarios corresponde a toda la actividad. El calendario ficticio puede declarar `cursoCompleto: true` cuando la actividad corresponde a la inscripción completa. Si falta esa evidencia, las bajas o el estado de algún destinatario, **Sin entrega** indica **No calculable**. El libro admite `fechaEfectiva` individual y `borradorEn` como fechas ISO con zona. Una fecha efectiva desconocida deja **Atraso por confirmar** en la fila.
 
 ## Fechas, modalidades y decisiones de Academia
 
@@ -48,7 +57,7 @@ Se contrastó el documento externo `Requerimientos_Indicadores_Academia_v0_5.doc
 
 - D02 / ámbito y población: inscripción por impartición, grupos compartidos, responsabilidad docente, equivalencias y vigencia de movimientos de baja; esta demo no asigna ámbitos reales a los perfiles.
 - D05 / calendarios: intervalos de ciclos, fecha de corte de consulta frente al cierre de cada actividad, horarios, prórrogas, reentregas e intentos, Mixta y calendario del propedéutico.
-- D07 / reportes: definición de tarea, tratamiento de otros tipos, denominadores, ponderaciones por curso y redondeo. Los pesos 40/30/10/20 y 100/0/0/0 son únicamente fixtures.
+- D07 / reportes: definición de tarea, tratamiento de otros tipos, denominadores, ponderaciones por curso y redondeo. La demo usa ponderaciones ficticias de 40/30/10/20, 100/0/0/0 y 0/100/0/0 según el curso.
 - La correspondencia del libro con evidencia de entregas de Moodle. Un libro real puede no contener fechas/estados de entrega: **no se debe inferir recepción o falta de entrega de una celda de nota vacía**. El JSON ficticio sí contiene ambos datos de forma explícita.
 - Formatos y claves reales, cancelaciones de bajas, equivalencias entre plataformas y política de conservación de versiones. No hay reglas institucionales definitivas en esta implementación.
 
@@ -105,7 +114,7 @@ Confirmar con muestras anonimizadas: CSV/XLSX/hojas, encabezados, separadores, c
 2. Filtrar Ejecutiva → EJE-101 → Gestión ejecutiva → Actividad integradora → Unidad 2 → Extemporánea: una entrega pendiente y una persona. Recargar: misma selección. Cambiar ciclo: limpia los filtros dependientes y no recupera insumos de 27-1.
 3. Cambiar a Sistemas → `/admin/insumos` → 27-2. Descargar/cargar primero solo calendario, validar y activar. Consultar reportes: calendario visible, totales no calculables.
 4. Cargar SPAI y libro de ejemplo: una persona/una entrega calificada con cero. Duplicar una fila o cargar el libro de otro ciclo: rechazo con fila y motivo; la versión anterior sigue disponible. Activar otra versión válida: solo cambia ese tipo y ciclo.
-5. Cargar bajas: se excluye el par. Volver a 27-1: conserva sus 31 calificadas y 17 pendientes. Recargar conserva la simulación de la pestaña.
+5. Cargar bajas: se excluye el par. Volver a 27-1: conserva sus 49 calificadas y 19 pendientes. Recargar conserva la simulación de la pestaña.
 6. Probar acceso directo a Administración como Coordinación/Dirección (restringido), Sistemas (permitido), estados vacío/incompleto/error y pantallas de 1440, 375 y 320 px.
 
 Pruebas unitarias en `core/reporting/reporting.spec.ts`: contrato, duplicados, fechas, pesos, identidades, cero, clasificaciones, conteos, filtros, cruces, bajas, activación y conservación de versiones. E2E `e2e/reports.spec.ts`: filtros, consultas, ciclo, carga parcial/válida/inválida, recarga, acceso directo, teclado, AXE, móvil y capturas adjuntas al reporte Playwright. La suite completa conserva el recorrido original.
