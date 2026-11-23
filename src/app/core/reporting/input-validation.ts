@@ -276,7 +276,11 @@ export function validateInput(text: string, type: InputType, cycle: string): Val
         reject(n, `${key}: usa un identificador sin espacios.`);
     }
     for (const key of Object.keys(row))
-      if (!fields[type].includes(key)) reject(n, `Campo no reconocido: ${key}.`);
+      if (key === 'cursoCompleto' && type === 'calendario') {
+        if (typeof row[key] !== 'boolean') reject(n, 'cursoCompleto debe ser booleano.');
+      } else if (type === 'calificaciones' && (key === 'fechaEfectiva' || key === 'borradorEn')) {
+        if (!validDate(row[key])) reject(n, 'Se requiere fecha ISO con hora y zona: ' + key);
+      } else if (!fields[type].includes(key)) reject(n, 'Campo no reconocido: ' + key + '.');
     if (row['ciclo'] !== cycle) reject(n, 'La fila pertenece a otro ciclo.');
     for (const field of dates)
       if (validDate(row[field])) {

@@ -1,0 +1,147 @@
+<section aria-labelledby="tracking-heading" class="panel tracking">
+  <header class="intro">
+    <div>
+      <span class="eyebrow">{{ label() }}</span>
+      <h2 id="tracking-heading">Seguimiento de tareas</h2>
+    </div>
+    <span class="pill">Datos simulados</span>
+  </header>
+  <button type="button" mat-button (click)="back.emit()">
+    <app-ui-icon name="arrowLeft" /> Volver al desglose
+  </button>
+  @if (items().length > 1) {
+    <h3 id="contribution-heading" tabindex="-1">Actividades que aportan al indicador</h3>
+    @if (indicator() === 'personas') {
+      <details>
+        <summary>{{ uniqueStudents().length }} estudiantes únicos</summary>
+        <ul>
+          @for (s of uniqueStudents(); track s.estudianteId) {
+            <li>{{ s.estudiante }} · {{ s.matricula }}</li>
+          }
+        </ul>
+      </details>
+      <p>Una persona puede aparecer en varias actividades.</p>
+    }
+    <div class="contributions">
+      @for (item of items(); track item.activity.cursoId + ':' + item.activity.actividadId) {
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="choose.emit(item)"
+          [attr.aria-pressed]="activity() === item"
+        >
+          {{ item.activity.actividad }} · {{ item.activity.asignatura }} ·
+          {{ item.activity.grupo }} · {{ item.count }}
+          {{
+            indicator() === 'personas'
+              ? item.count === 1
+                ? 'estudiante'
+                : 'estudiantes'
+              : item.count === 1
+                ? 'entrega'
+                : 'entregas'
+          }}
+        </button>
+      }
+    </div>
+  }
+  @if (activity(); as item) {
+    @let a = item.activity;
+    <div class="detail-title">
+      <h3 id="activity-heading" tabindex="-1">Detalle de la actividad</h3>
+      <strong>{{ a.actividad }}</strong>
+      <p>{{ a.asignatura }} · {{ a.grupo }}</p>
+      <p>{{ nav.periodLabel() }} · {{ a.carrera }} · {{ a.modalidad }}</p>
+      <p>Corte simulado · {{ cut() | date: 'dd/MM/yyyy HH:mm' : '-0500' }} · Cancún</p>
+    </div>
+    @if (!person()) {
+      <div class="overview">
+        <div>
+          <strong>{{ a.confirmed ? a.recipients : 'Por confirmar' }}</strong
+          ><span>Destinatarios de la actividad</span>
+        </div>
+        <div>
+          <strong>{{ a.graded + a.pending }}</strong
+          ><span>Entregas con estado determinado en la selección</span>
+        </div>
+        <div>
+          <strong>{{
+            a.progress !== null
+              ? a.progress + '%'
+              : !a.confirmed || a.unknown
+                ? 'Por confirmar'
+                : 'Sin entregas'
+          }}</strong
+          ><span>Avance de calificación</span>
+          @if (a.progress !== null) {
+            <small>{{ a.graded }} de {{ a.graded + a.pending }} entregas calificadas</small>
+          }
+        </div>
+      </div>
+      <div class="cards">
+        @for (card of cards(); track card.key) {
+          <button
+            type="button"
+            class="metric state-card"
+            [id]="'card-' + card.key"
+            [attr.data-state]="card.key"
+            [attr.aria-expanded]="selected()?.key === card.key"
+            (click)="showList(card.key)"
+          >
+            <app-ui-icon [name]="card.icon" /><strong>{{
+              card.rows?.length ?? 'No calculable'
+            }}</strong
+            ><span>{{ card.label }}</span>
+          </button>
+        }
+      </div>
+    }
+    @if (indicator() === 'personas' && !selected()) {
+      <h4 id="people-heading">Estudiantes en esta actividad</h4>
+      <ul aria-labelledby="people-heading">
+        @for (r of item.rows; track r.student.estudianteId) {
+          <li>{{ r.student.estudiante }} · {{ r.student.matricula }}</li>
+        }
+      </ul>
+    }
+    @if (selected(); as list) {
+      <div class="list">
+        <h4 id="list-heading" tabindex="-1">{{ list.label }}</h4>
+        @if (list.rows === null) {
+          <p>
+            Población de la actividad por confirmar. Falta evidencia del alcance o de sus estados al
+            corte.
+          </p>
+        } @else if (list.rows.length) {
+          <ul aria-labelledby="list-heading">
+            @for (row of list.rows; track row.student.estudianteId) {
+              <li>
+                <div>
+                  <strong>{{ row.student.estudiante }}</strong
+                  ><small>{{ row.student.matricula }}</small>
+                </div>
+                @if (list.key === 'sin-entrega') {
+                  <div>
+                    <span
+                      >Fecha efectiva ·
+                      {{
+                        row.effectiveDue
+                          ? (row.effectiveDue | date: 'dd/MM/yyyy HH:mm' : '-0500')
+                          : 'Por confirmar'
+                      }}</span
+                    >
+                    <small>{{ delay(row.effectiveDue) }}</small>
+                  </div>
+                } @else if (row.grade !== null) {
+                  <span>Calificación · {{ row.grade }}</span>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p>Sin estudiantes en este estado para la selección.</p>
+        }
+      </div>
+    }
+  }
+</section>

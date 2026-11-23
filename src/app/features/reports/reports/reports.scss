@@ -47,3 +47,119 @@ dl {
 .pilot-link {
   text-decoration: underline;
 }
+
+.query-desktop {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 18px;
+  flex-wrap: wrap;
+}
+.query-desktop button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 16px;
+  color: var(--brand);
+  background: white;
+  font-weight: 600;
+}
+.query-desktop button[aria-pressed='true'] {
+  background: var(--brand);
+  color: white;
+}
+.query-mobile {
+  display: none;
+}
+.metric-card {
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.metrics button:enabled:hover,
+.count-link:hover {
+  background: #eff5ff;
+}
+.count-link app-ui-icon {
+  width: 14px;
+  height: 14px;
+}
+.breakdown th small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+.active-row {
+  background: #eaf2fe;
+}
+.detail-row > td {
+  background: #f3f7fd;
+  padding: 12px;
+}
+.detail-row app-task-tracking {
+  margin: 0;
+}
+.sources {
+  padding: 18px;
+}
+.sources summary {
+  font-weight: 650;
+  color: var(--brand);
+  cursor: pointer;
+}
+.sources[open] summary {
+  margin-bottom: 16px;
+}
+@media (max-width: 700px) {
+  .query-desktop {
+    display: none;
+  }
+  .query-mobile {
+    display: block;
+    width: 100%;
+    margin-bottom: 14px;
+  }
+  .metric-card {
+    padding: 12px;
+  }
+  .detail-row,
+  .detail-row > td {
+    padding: 2px;
+  }
+  .count-link {
+    min-width: 50px;
+  }
+  .sources {
+    padding: 12px;
+  }
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.metrics[data-query='docentes'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.metrics[data-query='estudiantes'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.metrics button:enabled {
+  cursor: pointer;
+}
+.metric-card:focus-visible,
+.query-desktop button:focus-visible {
+  outline: 3px solid #2460a5;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .metrics,
+  .metrics[data-query='docentes'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metrics[data-query='docentes'] > :first-child {
+    grid-column: 1/-1;
+  }
+}

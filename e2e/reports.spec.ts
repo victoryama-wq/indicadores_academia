@@ -8,9 +8,45 @@ const context =
   'periodo=p01&corte=c01&carrera=todas&modalidad=todas&grupo=todos&asignatura=todas&docente=todos&tipo=todos&unidad=todas';
 const nextCycle = context.replace('p01', 'p02');
 async function choose(page: Page, label: string, option: string) {
+  if (label === 'Consulta' && (page.viewportSize()?.width ?? 1280) > 700) {
+    await page.getByRole('button', { name: option, exact: true }).click();
+    return;
+  }
+  if (
+    [
+      'Ciclo',
+      'Grupo',
+      'Carrera',
+      'Modalidad',
+      'Asignatura e impartición',
+      'Tipo de actividad',
+      'Unidad',
+      'Entregas extemporáneas',
+    ].includes(label)
+  ) {
+    const scope = page.getByRole('button', { name: 'Alcance del reporte', exact: true });
+    if ((await scope.count()) && (await scope.getAttribute('aria-expanded')) === 'false')
+      await scope.click();
+    const advanced = page.getByRole('button', { name: 'Más filtros', exact: true });
+    if (
+      [
+        'Asignatura e impartición',
+        'Tipo de actividad',
+        'Unidad',
+        'Entregas extemporáneas',
+      ].includes(label) &&
+      (await advanced.getAttribute('aria-expanded')) === 'false'
+    )
+      await advanced.click();
+  }
   await page.getByRole('combobox', { name: label, exact: true }).click();
   await page.getByRole('option', { name: option, exact: true }).click();
   await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+async function reviewSources(page: Page) {
+  const sources = page.locator('details.sources');
+  if ((await sources.getAttribute('open')) === null) await sources.locator('summary').click();
+  await page.getByRole('link', { name: 'Revisar insumos por ciclo' }).click();
 }
 async function audit(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -53,16 +89,16 @@ for (const width of [1440, 375, 320]) {
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto('/reportes?' + context);
-      await expect(page.getByTestId('report-people')).toHaveText('38');
-      await expect(page.getByTestId('report-graded')).toHaveText('31');
-      await expect(page.getByTestId('report-pending')).toHaveText('17');
-      await expect(page.getByTestId('report-summary')).toContainText('54 pares');
+      await expect(page.getByTestId('report-people')).toHaveText('62');
+      await expect(page.getByTestId('report-graded')).toHaveText('49');
+      await expect(page.getByTestId('report-pending')).toHaveText('19');
+      await expect(page.getByTestId('report-summary')).toContainText('78 pares');
       await expect(
         page
           .locator('.metric-card')
           .filter({ hasText: 'Avance de calificación' })
           .locator('strong'),
-      ).toHaveText('65%');
+      ).toHaveText('72%');
       await expect(
         page.getByText('Tarea 40% · Integradora 30% · Foro 10% · Examen 20%', { exact: true }),
       ).toHaveCount(3);
@@ -73,11 +109,16 @@ for (const width of [1440, 375, 320]) {
       await audit(page);
       await capture(page, 'reportes-' + width);
       const consulta = page.getByRole('combobox', { name: 'Consulta', exact: true });
-      await consulta.focus();
-      await page.keyboard.press('Enter');
-      await page.keyboard.press('Home');
-      await page.keyboard.press('Enter');
-      await expect(page.getByRole('listbox')).toHaveCount(0);
+      if (width === 1440) {
+        const students = page.getByRole('button', {
+          name: 'Estudiantes con tarea calificada',
+          exact: true,
+        });
+        await students.focus();
+        await page.keyboard.press('Enter');
+      } else {
+        await choose(page, 'Consulta', 'Estudiantes con tarea calificada');
+      }
       await expect(page.getByTestId('graded-students')).toContainText('24 estudiantes únicos');
       const student = page
         .getByRole('table', { name: 'Estudiantes con tarea calificada' })
@@ -88,9 +129,13 @@ for (const width of [1440, 375, 320]) {
       await choose(page, 'Consulta', 'Docentes con pendientes');
       await expect(
         page.getByRole('table', { name: 'Docentes con pendientes' }).getByRole('row'),
-      ).toHaveCount(4);
+      ).toHaveCount(5);
       await page.reload();
-      await expect(consulta).toContainText('Docentes con pendientes');
+      if (width === 1440)
+        await expect(
+          page.getByRole('button', { name: 'Docentes con pendientes', exact: true }),
+        ).toHaveAttribute('aria-pressed', 'true');
+      else await expect(consulta).toContainText('Docentes con pendientes');
       await audit(page);
       await choose(page, 'Perfil simulado', 'Sistemas');
       await page.goto('/admin/insumos?' + nextCycle);
@@ -117,7 +162,7 @@ test('filtros de reporte se conservan por URL y el ciclo nuevo limpia el context
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/reportes?' + context);
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
   await choose(page, 'Modalidad', 'Ejecutiva');
   await expect(page.getByTestId('report-pending')).toHaveText('2');
   await choose(page, 'Carrera', 'Licenciatura en Administración');
@@ -140,7 +185,7 @@ test('filtros de reporte se conservan por URL y el ciclo nuevo limpia el context
   await expect(page.getByTestId('report-graded')).toHaveCount(0);
   await expect(page.getByText('Gestión ejecutiva · EJE-101', { exact: true })).toHaveCount(0);
   await choose(page, 'Ciclo', '27-1 · En operación (demo)');
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
   await choose(page, 'Modalidad', 'Mixta');
   await choose(page, 'Entregas extemporáneas', 'Sin criterio configurado');
   await expect(page.getByTestId('report-summary')).toContainText('2 sin criterio configurado');
@@ -161,7 +206,7 @@ test('activación parcial, reemplazo válido e inválido, bajas y aislamiento en
   await expect(
     page.getByRole('heading', { name: 'Tarea de demostración', exact: true }),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'Revisar insumos por ciclo' }).click();
+  await reviewSources(page);
   await upload(page, 'spai', sampleBatch('spai', 'p02'));
   await upload(page, 'calificaciones', sampleBatch('calificaciones', 'p02'));
   const invalid = sampleBatch('calificaciones', 'p02');
@@ -180,7 +225,7 @@ test('activación parcial, reemplazo válido e inválido, bajas y aislamiento en
   await expect(page.getByTestId('report-people')).toHaveText('1');
   await page.reload();
   await expect(page.getByTestId('report-graded')).toHaveText('1');
-  await page.getByRole('link', { name: 'Revisar insumos por ciclo' }).click();
+  await reviewSources(page);
   const pending = sampleBatch('calificaciones', 'p02');
   if (pending.tipo !== 'calificaciones') throw new Error('Plantilla incorrecta');
   pending.filas[0].calificacion = null;
@@ -190,7 +235,7 @@ test('activación parcial, reemplazo válido e inválido, bajas y aislamiento en
   await page.getByRole('link', { name: 'Consultar reportes de este ciclo' }).click();
   await expect(page.getByTestId('report-pending')).toHaveText('1');
   await expect(page.getByTestId('report-graded')).toHaveText('0');
-  await page.getByRole('link', { name: 'Revisar insumos por ciclo' }).click();
+  await reviewSources(page);
   await upload(page, 'bajas', sampleBatch('bajas', 'p02'));
   await page.getByRole('link', { name: 'Consultar reportes de este ciclo' }).click();
   await expect(
@@ -198,8 +243,8 @@ test('activación parcial, reemplazo válido e inválido, bajas y aislamiento en
   ).toBeVisible();
   await expect(page.getByTestId('report-summary')).toContainText('0 pares');
   await page.goto('/reportes?' + context);
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
-  await expect(page.getByTestId('report-pending')).toHaveText('17');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
+  await expect(page.getByTestId('report-pending')).toHaveText('19');
 });
 
 test('acceso directo por perfil, calendario desconocido y estados incompleto/error', async ({
@@ -209,7 +254,7 @@ test('acceso directo por perfil, calendario desconocido y estados incompleto/err
   await expect(page.getByRole('heading', { name: 'Acceso restringido' })).toBeVisible();
   await choose(page, 'Perfil simulado', 'Dirección');
   await page.goto('/reportes?' + context);
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
   await expect(page.getByRole('link', { name: 'Revisar insumos por ciclo' })).toHaveCount(0);
   await page.goto('/admin/insumos?' + context);
   await expect(page.getByRole('heading', { name: 'Acceso restringido' })).toBeVisible();
@@ -221,7 +266,7 @@ test('acceso directo por perfil, calendario desconocido y estados incompleto/err
   await choose(page, 'Perfil simulado', 'Coordinación');
   await expect(page).toHaveURL(/\/inicio/);
   await page.goto('/reportes?' + context);
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
   await page.goto('/reportes?' + context.replace('p01', 'inexistente'));
   await expect(page.getByTestId('report-graded')).toHaveCount(0);
   await expect(
@@ -237,7 +282,7 @@ test('acceso directo por perfil, calendario desconocido y estados incompleto/err
   ).toBeVisible();
   await page.getByRole('button', { name: 'Volver al corte de demostración' }).click();
   await expect(page).toHaveURL(/\/reportes/);
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
 });
 
 test('Reportes usa el calendario activo, conserva versiones rechazadas y aísla ciclos y pestañas', async ({
@@ -261,7 +306,7 @@ test('Reportes usa el calendario activo, conserva versiones rechazadas y aísla 
     }),
   ).toBeVisible();
   await expect(page.getByTestId('report-graded')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Revisar insumos por ciclo' }).click();
+  await reviewSources(page);
   const revised = sampleBatch('calendario', 'p02');
   if (revised.tipo !== 'calendario') throw new Error('Plantilla incorrecta');
   revised.filas[0].actividad = 'Tarea ficticia revisada';
@@ -301,7 +346,7 @@ test('Reportes usa el calendario activo, conserva versiones rechazadas y aísla 
   ).toHaveCount(0);
   await otherTab.close();
   await choose(page, 'Ciclo', '27-1 · En operación (demo)');
-  await expect(page.getByTestId('report-graded')).toHaveText('31');
+  await expect(page.getByTestId('report-graded')).toHaveText('49');
   await expect(
     page.getByRole('heading', { name: 'Tarea ficticia revisada', exact: true }),
   ).toHaveCount(0);
@@ -348,4 +393,71 @@ test('plantillas descargables, ejemplos documentados y rechazos de archivo vací
     card.getByRole('table').getByRole('row').last().locator('[data-label="Fila"]'),
   ).toHaveText('1');
   await expect(card).toContainText('Sin versión vigente');
+});
+
+test('la franja, el filtro y el desglose comparten el grupo del enlace directo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const checkGroup = async (id: string, group: string, teacher: string) => {
+    await expect(page).toHaveURL((url) => url.searchParams.get('grupo') === id);
+    await expect(
+      page.getByRole('region', { name: 'Contexto del periodo, corte y grupo' }),
+    ).toContainText('Grupo ' + group + ' ·');
+    await expect(page.getByRole('combobox', { name: 'Grupo', exact: true })).toHaveText(group);
+    await expect(
+      page.getByLabel('Filtros activos').getByText('Grupo · ' + group, { exact: true }),
+    ).toBeVisible();
+    const teachers = page
+      .getByRole('table', { name: 'Docentes con pendientes' })
+      .getByRole('rowheader');
+    await expect(teachers).toHaveCount(1);
+    await expect(teachers).toContainText(teacher);
+    await expect(teachers).toContainText(group);
+  };
+
+  await page.goto('/reportes?reporte=docentes&grupo=rep-adm102');
+  await checkGroup('rep-adm102', 'ADM-102', 'Docente Demo E');
+  await page.reload();
+  await checkGroup('rep-adm102', 'ADM-102', 'Docente Demo E');
+  await choose(page, 'Grupo', 'ENF-301');
+  await checkGroup('g01', 'ENF-301', 'Docente Demo A');
+});
+
+test('desde el desglose, el detalle conserva filtros y corte hasta cambiar de ciclo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/reportes?' + context);
+  await choose(page, 'Grupo', 'ADM-102');
+  await choose(page, 'Consulta', 'Docentes con pendientes');
+  const button = page.getByRole('button', {
+    name: 'Ver las 2 entregas pendientes de Docente Demo E',
+  });
+  await button.click();
+  const detail = page.getByRole('region', { name: 'Seguimiento de tareas' });
+  await expect(detail.getByRole('heading', { name: 'Pendientes de calificar' })).toBeFocused();
+  await expect(detail.getByRole('listitem')).toHaveCount(2);
+  await detail.getByRole('button', { name: '4 Sin entrega' }).click();
+  await page.reload();
+  await expect(detail.getByRole('listitem')).toHaveCount(4);
+  await expect(detail).toContainText('1 día 5 horas 59 minutos de atraso');
+  await expect(page).toHaveURL(/grupo=rep-adm102/);
+  await detail.getByRole('button', { name: 'Volver al desglose' }).click();
+  await expect(button).toBeFocused();
+  await page.goBack();
+  await expect(detail.getByRole('listitem')).toHaveCount(4);
+  await choose(page, 'Ciclo', '27-2 · Preparación (demo)');
+  await expect(detail).toHaveCount(0);
+  await expect(page).not.toHaveURL(/actividadDetalle|listaDetalle|filaReporte/);
+  await page.goBack();
+  await expect(detail.getByRole('listitem')).toHaveCount(4);
+  await choose(page, 'Grupo', 'ENF-301');
+  await expect(detail).toHaveCount(0);
+  await page.getByRole('button', { name: /Ver las 6 entregas pendientes de/ }).click();
+  await expect(detail).toContainText('Plan de cuidados');
+  await expect(detail).toContainText('18 de 24 entregas calificadas');
+  await expect(detail).toContainText('75%');
+  await expect(detail.getByRole('listitem')).toHaveCount(6);
+  await expect(detail).not.toContainText('DEMO-C');
 });

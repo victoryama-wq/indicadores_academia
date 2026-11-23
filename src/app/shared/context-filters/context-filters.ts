@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -6,38 +7,12 @@ import { MatButton } from '@angular/material/button';
 import { NavigationContext } from '../../core/navigation-context';
 import { QueryStore } from '../../core/query-store';
 import { AcademicCatalog, QueryContext } from '../../core/models';
-import { CYCLES, MODALITIES, TYPE_LABELS } from '../../core/reporting/report-models';
+import { CYCLES, LATE_LABELS, MODALITIES, TYPE_LABELS } from '../../core/reporting/report-models';
 @Component({
   selector: 'app-context-filters',
-  imports: [MatExpansionModule, MatFormFieldModule, MatSelectModule, MatButton],
+  imports: [NgTemplateOutlet, MatExpansionModule, MatFormFieldModule, MatSelectModule, MatButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: ` <mat-expansion-panel class="filter-panel" [expanded]="desktop">
-    <mat-expansion-panel-header
-      ><mat-panel-title>Filtros de consulta</mat-panel-title
-      ><mat-panel-description
-        >Ámbito de la demostración</mat-panel-description
-      ></mat-expansion-panel-header
-    >
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      @for (field of fields(); track field.key) {
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"
-          ><mat-label>{{ field.label }}</mat-label
-          ><mat-select
-            [value]="nav.context()[field.key]"
-            (selectionChange)="change(field.key, $event.value)"
-          >
-            @for (option of field.options; track option.value) {
-              <mat-option [value]="option.value">{{ option.label }}</mat-option>
-            }
-          </mat-select></mat-form-field
-        >
-      }
-    </div>
-    <div class="filter-foot">
-      <span>Los filtros se aplican al instante y se conservan al navegar.</span
-      ><button type="button" mat-button (click)="nav.resetFilters()">Restablecer filtros</button>
-    </div>
-  </mat-expansion-panel>`,
+  templateUrl: './context-filters.html',
 })
 export class ContextFilters {
   readonly reportMode = input(false);
@@ -65,7 +40,7 @@ export class ContextFilters {
     },
     {
       key: 'corte',
-      label: 'Corte',
+      label: this.reportMode() ? 'Información al…' : 'Corte',
       options: [
         {
           value: 'c01',
@@ -172,8 +147,78 @@ export class ContextFilters {
       ],
     },
   ]);
+  readonly primaryKeys = new Set(['periodo', 'corte', 'carrera', 'modalidad', 'grupo']);
+  readonly classifications = Object.entries(LATE_LABELS);
+  readonly primary = computed(() => this.reportFields().filter((f) => this.primaryKeys.has(f.key)));
+  readonly advanced = computed(() =>
+    this.reportFields().filter((f) => !this.primaryKeys.has(f.key)),
+  );
+  readonly reportFields = computed(() => {
+    const ctx = this.nav.context();
+    const catalog = this.optionsCatalog();
+    const groups = (catalog?.groups ?? []).filter(
+      (g) =>
+        (ctx.carrera === 'todas' || ctx.carrera === g.programId) &&
+        (ctx.modalidad === 'todas' || ctx.modalidad === g.modalityId),
+    );
+    const subjects = (catalog?.subjects ?? []).filter(
+      (s) =>
+        groups.some((g) => g.id === s.groupId) &&
+        (ctx.grupo === 'todos' || ctx.grupo === s.groupId),
+    );
+    return this.fields().map((f) => {
+      const options = f.options.filter((o) => {
+        if (['todos', 'todas'].includes(o.value)) return true;
+        if (f.key === 'grupo') return groups.some((g) => g.id === o.value);
+        if (f.key === 'docente') return subjects.some((s) => s.teacherId === o.value);
+        if (f.key === 'asignatura')
+          return subjects.some(
+            (s) => s.id === o.value && (ctx.docente === 'todos' || ctx.docente === s.teacherId),
+          );
+        return true;
+      });
+      return { ...f, options, value: ctx[f.key] };
+    });
+  });
+  readonly active = computed(() => {
+    const ctx = this.nav.context();
+    const chosen = this.fields()
+      .filter((f) => !['todos', 'todas'].includes(ctx[f.key]))
+      .map(
+        (f) =>
+          (f.key === 'corte' ? 'Información al ' : f.label + ' · ') +
+          (f.options.find((o) => o.value === ctx[f.key])?.label ?? ctx[f.key]),
+      );
+    const late = this.classifications.find(([key]) => key === this.nav.params()['extemporaneas']);
+    return late ? [...chosen, late[1]] : chosen;
+  });
   change(key: keyof QueryContext, value: string) {
+    const dependent: Partial<QueryContext> = {};
+    if (this.reportMode() && ['carrera', 'modalidad', 'grupo', 'docente'].includes(key)) {
+      const ctx = { ...this.nav.context(), [key]: value };
+      const groups = (this.optionsCatalog()?.groups ?? []).filter(
+        (g) =>
+          (ctx.carrera === 'todas' || ctx.carrera === g.programId) &&
+          (ctx.modalidad === 'todas' || ctx.modalidad === g.modalityId),
+      );
+      if (!groups.some((g) => g.id === ctx.grupo)) ctx.grupo = dependent.grupo = 'todos';
+      const subjects = (this.optionsCatalog()?.subjects ?? []).filter(
+        (s) =>
+          groups.some((g) => s.groupId === g.id) &&
+          (ctx.grupo === 'todos' || s.groupId === ctx.grupo),
+      );
+      if (!subjects.some((s) => s.teacherId === ctx.docente))
+        ctx.docente = dependent.docente = 'todos';
+      if (
+        !subjects.some(
+          (s) =>
+            s.id === ctx.asignatura && (ctx.docente === 'todos' || s.teacherId === ctx.docente),
+        )
+      )
+        dependent.asignatura = 'todas';
+    }
     void this.nav.update({
+      ...dependent,
       [key]: value,
       ...(key === 'periodo' ? { corte: 'c01' } : {}),
       ...(this.reportMode() && key === 'periodo'

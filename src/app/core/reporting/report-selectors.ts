@@ -147,7 +147,9 @@ export function selectReport(
       const state = !grade
         ? 'sin-datos'
         : !submitted
-          ? 'sin-entrega'
+          ? grade.borradorEn && Date.parse(grade.borradorEn) <= asOf
+            ? 'borrador'
+            : 'sin-entrega'
           : grade.calificacion !== null &&
               grade.calificadaEn &&
               Date.parse(grade.calificadaEn) <= asOf
@@ -157,9 +159,13 @@ export function selectReport(
         calendar: a,
         student,
         state,
+        effectiveDue: grade?.fechaEfectiva ?? null,
         submittedAt: submitted,
         grade: state === 'calificada' ? (grade?.calificacion ?? null) : null,
-        late: state === 'sin-datos' ? 'sin-criterio' : classifyDelivery(a, submitted),
+        late:
+          state === 'sin-datos' || state === 'borrador'
+            ? 'sin-criterio'
+            : classifyDelivery(a, submitted),
       });
     }
   const filtered = records.filter((r) => late === 'todas' || r.late === late);
@@ -213,7 +219,22 @@ export function selectReport(
       type,
       ...count(filtered.filter((r) => r.calendar.tipo === type)),
     })),
-    activities: calendar.map((a) => ({ ...a, ...count(filtered.filter((r) => r.calendar === a)) })),
+    activities: calendar.map((a) => {
+      const population = records.filter((r) => r.calendar === a);
+      const rows = filtered.filter((r) => r.calendar === a);
+      return {
+        ...a,
+        ...count(rows),
+        rows,
+        confirmed:
+          a.cursoCompleto === true &&
+          !missingSources.length &&
+          sources.some((b) => b.tipo === 'bajas') &&
+          !issues.length &&
+          population.every((r) => r.state !== 'sin-datos'),
+        recipients: population.length,
+      };
+    }),
     teachers: [
       ...new Map(
         filtered
@@ -234,3 +255,5 @@ export function selectReport(
     })),
   };
 }
+
+export type ReportActivity = ReturnType<typeof selectReport>['activities'][number];

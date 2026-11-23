@@ -43,7 +43,7 @@ export class App {
   readonly store = inject(QueryStore);
   readonly groupLabel = computed(
     () =>
-      this.store.data()?.catalog.groups.find((g) => g.id === this.nav.context().grupo)?.name ??
+      this.store.catalog()?.groups.find((g) => g.id === this.nav.context().grupo)?.name ??
       this.nav.context().grupo,
   );
   readonly menuOpen = signal(false);

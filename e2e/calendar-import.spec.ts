@@ -11,9 +11,15 @@ const fixture = (name: string) =>
   resolve('docs/ejemplos-insumos/calendario-27-2-ficticio-' + name + '.xlsx');
 async function choose(page: Page, label: string, option: string) {
   if (['Modalidad', 'Unidad', 'Tipo de actividad', 'Ciclo'].includes(label)) {
-    const filters = page.getByRole('button', { name: /Filtros de consulta/ });
+    const filters = page.getByRole('button', { name: /Alcance del reporte/ });
     await expect(filters).toBeVisible();
     if ((await filters.getAttribute('aria-expanded')) === 'false') await filters.click();
+    const more = page.getByRole('button', { name: 'Más filtros' });
+    if (
+      ['Unidad', 'Tipo de actividad'].includes(label) &&
+      (await more.getAttribute('aria-expanded')) === 'false'
+    )
+      await more.click();
   }
   await page.getByRole('combobox', { name: label, exact: true }).click();
   await page.getByRole('option', { name: option, exact: true }).click();
@@ -110,7 +116,8 @@ for (const width of [1440, 375])
       await expect(schedule).toContainText('3 actividades');
       await choose(page, 'Ciclo', '27-1 · En operación (demo)');
       await expect(schedule).toHaveCount(0);
-      await expect(page.getByTestId('report-graded')).toHaveText('31');
+      await expect(page.getByTestId('report-graded')).toHaveText('49');
+      await page.getByText('Fuentes y criterios', { exact: true }).click();
       await expect(page.getByText('06/11/2026 23:59', { exact: true }).first()).toBeVisible();
       await expect(page.getByText('12/03/2027 00:00', { exact: true })).toHaveCount(0);
       await choose(page, 'Ciclo', '27-2 · Preparación (demo)');

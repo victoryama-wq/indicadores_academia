@@ -60,7 +60,9 @@ test('Sistemas activa el padrón y las asignaciones XLSX, conserva la versión e
   await expect(page.locator('app-population-view')).toContainText('2026-11-12');
   await expect(page.getByText(/No calculables: falta verificar/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('combobox', { name: 'Ciclo del cruce' }).click();
+  const scope = page.getByRole('button', { name: 'Alcance del reporte' });
+  if ((await scope.getAttribute('aria-expanded')) === 'false') await scope.click();
+  await page.getByRole('combobox', { name: 'Ciclo', exact: true }).click();
   await page.getByRole('option', { name: /27-2/ }).click();
   await expect(page).toHaveURL(/periodo=p02/);
   await expect(page.locator('app-population-view')).toHaveCount(0);
@@ -94,7 +96,7 @@ test('Sistemas activa el padrón y las asignaciones XLSX, conserva la versión e
   await expect(page.getByText(/No calculables: falta verificar/)).toBeVisible();
   const calendar = page.getByRole('region', { name: 'Programación del calendario importado' });
   await expect(calendar).toContainText('84 actividades');
-  await page.getByRole('button', { name: /Filtros de consulta/ }).click();
+  if ((await scope.getAttribute('aria-expanded')) === 'false') await scope.click();
   await page.getByRole('combobox', { name: 'Modalidad', exact: true }).click();
   await page.getByRole('option', { name: 'Virtual', exact: true }).click();
   await expect(calendar).toContainText('63 actividades');
@@ -117,13 +119,11 @@ test('SPAI XLSX distingue números de texto y rechaza grupos ajenos sin reemplaz
   }));
   const people = page.getByTestId('input-saeko'),
     courses = page.getByTestId('input-spai');
-  await people
-    .locator('input[type=file]')
-    .setInputFiles({
-      name: 'padron-ficticio.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(roster)),
-    });
+  await people.locator('input[type=file]').setInputFiles({
+    name: 'padron-ficticio.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(roster)),
+  });
   await people.getByRole('button', { name: 'Validar archivo' }).click();
   await people.getByRole('button', { name: 'Activar simulación' }).click();
   await expect(people.getByRole('status')).toContainText('Activación simulada completada');
