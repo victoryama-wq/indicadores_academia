@@ -38,7 +38,7 @@ test('Edge abre la vista de Coordinación con una sesión ficticia de Sistemas',
   const loginPage = await readFile(new URL('../preview/public/ingreso.html', import.meta.url));
   const loginScript = await readFile(new URL('../preview/public/ingreso.js', import.meta.url));
   const server = createServer((req, res) => {
-    if (req.url === '/ingreso.html')
+    if (new URL(req.url, 'http://localhost').pathname === '/ingreso.html')
       return res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(loginPage);
     if (req.url === '/ingreso.js')
       return res
@@ -95,16 +95,13 @@ test('Edge abre la vista de Coordinación con una sesión ficticia de Sistemas',
           await page.addInitScript(() => sessionStorage.setItem('academia-profile', 'sistemas'));
           await page.exposeFunction('testUid', () => selectedUid);
           await page.goto(origin + '/reportes');
-          await expect(page).toHaveURL(origin + '/ingreso.html');
+          await expect(page).toHaveURL(origin + '/ingreso.html?continuar=%2Freportes');
           const ingresar = page.getByRole('button', { name: 'Ingresar con Google' });
           await ingresar.click();
           await expect(page.getByRole('status')).toContainText('Esta cuenta no tiene acceso');
           selectedUid = 'sistemas-demo';
           await ingresar.click();
-          await expect(
-            page.getByRole('heading', { name: 'Seguimiento a plataforma Moodle' }),
-          ).toBeVisible();
-          await page.goto(origin + '/reportes');
+          await expect(page).toHaveURL(origin + '/reportes');
           await page.reload();
           await expect(page.getByRole('heading', { name: 'Reportes', exact: true })).toBeVisible();
           await viewportTest.test(
@@ -239,10 +236,33 @@ test('Edge abre la vista de Coordinación con una sesión ficticia de Sistemas',
           ).toBeVisible();
           await expect(page.locator('app-profile-selector')).toHaveCount(0);
           await expect(page.getByRole('link', { name: 'Insumos por ciclo' })).toHaveCount(0);
-          await page.getByRole('link', { name: 'Seguimiento docente' }).click();
-          await expect(
-            page.getByRole('heading', { name: 'Seguimiento docente', exact: true }),
-          ).toBeVisible();
+          // Salir del caso sin coincidencias y comprobar el mismo grupo en ambos módulos.
+          await page.goto(origin + '/reportes?periodo=p01&corte=c01&grupo=g01');
+          await expect(page.getByRole('heading', { name: 'Reportes', exact: true })).toBeVisible();
+          for (const [label, path, detailLink, detailHeading] of [
+            ['Grupos y asignaturas', '/grupos', 'Ver grupo', 'Grupo ENF-301'],
+            ['Seguimiento docente', '/docentes', 'Ver detalle de Docente Demo A', 'Docente Demo A'],
+          ]) {
+            if (width < 640) await page.getByRole('button', { name: 'Abrir menú' }).click();
+            const menuLink = page.getByRole('navigation', { name: 'Navegación principal' })
+              .getByRole('link', { name: label, exact: true });
+            const destination = new URL(await menuLink.getAttribute('href'), origin);
+            assert.equal(destination.pathname, path);
+            assert.equal(destination.searchParams.get('grupo'), 'g01');
+            // La página sigue abierta, pero la siguiente importación requiere una sesión nueva.
+            await context.clearCookies();
+            await menuLink.click();
+            await expect(ingresar).toBeVisible();
+            assert.equal(new URL(page.url()).searchParams.get('continuar'), destination.pathname + destination.search);
+            await ingresar.click();
+            await expect(page).toHaveURL(destination.href);
+            await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+            await page.getByRole('link', { name: detailLink, exact: true }).click();
+            await expect(page.getByRole('heading', { name: detailHeading, exact: true })).toBeVisible();
+            await page.getByRole('navigation', { name: 'Ruta de navegación' })
+              .getByRole('link', { name: label, exact: true }).click();
+            await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+          }
           assert.ok(
             await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
           );
@@ -250,7 +270,7 @@ test('Edge abre la vista de Coordinación con una sesión ficticia de Sistemas',
           await expect(page).toHaveURL(origin + '/ingreso.html');
           assert.ok(!(await context.cookies()).some((cookie) => cookie.name === '__session'));
           await page.goto(origin + '/reportes');
-          await expect(page).toHaveURL(origin + '/ingreso.html');
+          await expect(page).toHaveURL(origin + '/ingreso.html?continuar=%2Freportes');
         } finally {
           await context.close();
         }

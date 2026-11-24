@@ -12,13 +12,12 @@ import { NavigationContext } from '../../../core/navigation-context';
   template: `
     <nav class="breadcrumbs" aria-label="Ruta de navegación">
       <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a
-      ><span aria-hidden="true">/</span> Grupos
+      ><span aria-hidden="true">/</span> Grupos y asignaturas
     </nav>
     <div class="page-heading">
       <div>
-        <span class="eyebrow">SEGUIMIENTO ACADÉMICO</span>
-        <h1>Grupos de tu ámbito</h1>
-        <p>Selecciona un grupo para consultar sus asignaturas.</p>
+        <h1>Grupos y asignaturas</h1>
+        <p>Elige un grupo para revisar sus asignaturas, actividades y entregas.</p>
       </div>
     </div>
     <app-context-filters />

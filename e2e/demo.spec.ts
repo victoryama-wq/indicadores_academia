@@ -151,9 +151,9 @@ test('teclado: salto al contenido, foco del menú y cambio a escritorio', async 
   await toggle.press('Enter');
   await page
     .getByRole('navigation', { name: 'Navegación principal' })
-    .getByRole('link', { name: 'Seguimiento académico', exact: true })
+    .getByRole('link', { name: 'Grupos y asignaturas', exact: true })
     .click();
-  await ready(page, 'Grupos de tu ámbito');
+  await ready(page, 'Grupos y asignaturas');
   await expect(toggle).toBeFocused();
   await toggle.press('Enter');
   await expect(close).toBeFocused();
@@ -163,7 +163,7 @@ test('teclado: salto al contenido, foco del menú y cambio a escritorio', async 
   await expect(
     page
       .getByRole('navigation', { name: 'Navegación principal' })
-      .getByRole('link', { name: 'Seguimiento académico', exact: true }),
+      .getByRole('link', { name: 'Grupos y asignaturas', exact: true }),
   ).toHaveAttribute('aria-current', 'page');
   await audit(page);
 });

@@ -1,6 +1,22 @@
 const button = document.querySelector('#ingresar');
 const status = document.querySelector('#estado');
 
+function destinationAfterLogin() {
+  const path = new URLSearchParams(location.search).get('continuar');
+  if (path?.startsWith('/')) {
+    if (!URL.canParse(path, location.origin)) return '/inicio';
+    const target = new URL(path, location.origin);
+    if (
+      target.origin === location.origin &&
+      /^\/(?:inicio|reportes|grupos(?:\/[\w-]+)?|docentes(?:\/[\w-]+)?|(?:asignaturas|actividades|seguimiento)\/[\w-]+)\/?$/.test(target.pathname)
+    ) {
+      target.hash = location.hash;
+      return target.href;
+    }
+  }
+  return '/inicio';
+}
+
 try {
   const [{ initializeApp }, sdk, config] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js'),
@@ -11,6 +27,9 @@ try {
   await sdk.setPersistence(auth, sdk.inMemoryPersistence);
   const provider = new sdk.GoogleAuthProvider();
   provider.setCustomParameters({ hd: 'tecplayacar.edu.mx', prompt: 'select_account' });
+  if (new URLSearchParams(location.search).has('continuar')) {
+    status.textContent = 'Inicia sesión para continuar en el módulo seleccionado.';
+  }
   button.disabled = false;
   button.addEventListener('click', async () => {
     button.disabled = true;
@@ -23,7 +42,7 @@ try {
         body: JSON.stringify({ idToken: await user.getIdToken() }),
       });
       if (response.ok) {
-        location.replace('/inicio');
+        location.replace(destinationAfterLogin());
         return;
       }
       status.textContent =

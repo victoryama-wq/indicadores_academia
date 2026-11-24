@@ -40,7 +40,7 @@
       [queryParams]="nav.query()"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
-      ><app-ui-icon name="book" /> Seguimiento académico</a
+      ><app-ui-icon name="book" /> Grupos y asignaturas</a
     >
     @for (item of upcoming; track item.path) {
       <a
@@ -150,7 +150,13 @@
         Dirección · Modo consulta. Exportación pendiente de definición de Academia (D08).
       </div>
     }
-    @if (store.result().status === 'loading') {
+    @if (failedPage(); as target) {
+      <section class="panel empty" role="alert">
+        <h1>No se pudo abrir el módulo</h1>
+        <p>Vuelve a cargar la página para continuar con los filtros seleccionados.</p>
+        <a mat-flat-button [href]="target">Volver a intentar</a>
+      </section>
+    } @else if (store.result().status === 'loading') {
       <section class="panel loading" aria-live="polite">
         <p>Cargando datos simulados del corte…</p>
         <mat-progress-bar mode="indeterminate" aria-label="Cargando datos"></mat-progress-bar>

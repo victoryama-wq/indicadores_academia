@@ -57,7 +57,13 @@ test('la vista y sus recursos requieren una sesión Google de Sistemas', async (
       headers: { Origin: origin, 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
     });
-  assert.equal((await call('/docentes')).status, 302);
+  for (const path of ['/grupos?periodo=p01&grupo=g01', '/docentes/d01?corte=c01', '/reportes']) {
+    const unauthenticated = await call(path);
+    assert.equal(unauthenticated.status, 302);
+    const loginUrl = new URL(unauthenticated.headers.get('location'), 'http://localhost');
+    assert.equal(loginUrl.pathname, '/ingreso.html');
+    assert.equal(loginUrl.searchParams.get('continuar'), path);
+  }
   assert.equal((await call('/main.js')).status, 401);
   for (const id of ['externo', 'sinVerificar', 'coordinacion', 'otroProveedor'])
     assert.equal((await login(id)).status, 403);

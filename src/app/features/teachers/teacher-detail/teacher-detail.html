@@ -2,7 +2,7 @@
   <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span aria-hidden="true">/</span
   ><a routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
     >Seguimiento docente</a
-  ><span aria-hidden="true">/</span>Detalle
+  ><span aria-hidden="true">/</span>{{ teacher()?.name ?? 'Detalle docente' }}
 </nav>
 <a mat-button routerLink="/docentes" [queryParams]="nav.query({ origenDocente: null })"
   ><app-ui-icon name="arrowLeft" /> Volver al listado de docentes</a

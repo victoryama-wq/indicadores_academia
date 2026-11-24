@@ -9,7 +9,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, NavigationError, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { ProfileSelector } from './shared/profile-selector/profile-selector';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -58,6 +59,27 @@ export class App {
     { path: '/historicos', label: 'Históricos', icon: 'history' },
     { path: '/calidad', label: 'Calidad de información', icon: 'check' },
   ];
+  readonly failedPage = signal<string | null>(null);
+
+  constructor() {
+    const router = inject(Router);
+    if (!this.nav.vistaCoordinacion) return;
+    let hasOpenedPage = false;
+    router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+      if (event instanceof NavigationEnd) {
+        hasOpenedPage = true;
+        this.failedPage.set(null);
+      }
+      if (!(event instanceof NavigationError)) return;
+      const target = new URL(event.url, location.origin);
+      if (target.origin !== location.origin) return;
+      this.failedPage.set(target.href);
+      // Una carga completa permite al servidor volver a comprobar la sesión.
+      // Si falla la primera ruta del nuevo documento, queda disponible el reintento manual.
+      if (hasOpenedPage) location.assign(target.href);
+    });
+  }
+
   closeMenu() {
     if (this.menuOpen()) {
       this.menuOpen.set(false);
