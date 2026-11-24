@@ -238,6 +238,7 @@ test('Edge abre la vista de Coordinación con una sesión ficticia de Sistemas',
           await expect(page.getByRole('link', { name: 'Insumos por ciclo' })).toHaveCount(0);
           // Salir del caso sin coincidencias y comprobar el mismo grupo en ambos módulos.
           await page.goto(origin + '/reportes?periodo=p01&corte=c01&grupo=g01');
+          await expect(page.getByRole('heading', { name: 'Reportes', exact: true })).toBeVisible();
           for (const [label, path, detailLink, detailHeading] of [
             ['Grupos y asignaturas', '/grupos', 'Ver grupo', 'Grupo ENF-301'],
             ['Seguimiento docente', '/docentes', 'Ver detalle de Docente Demo A', 'Docente Demo A'],
