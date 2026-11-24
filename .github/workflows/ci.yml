@@ -91,6 +91,21 @@ jobs:
       - name: Validar piloto Moodle en Edge con datos ficticios
         run: npm run test:moodle:ui
 
+      - name: Compilar la vista privada para probar la navegación
+        run: npm run build:vista
+
+      - name: Preparar Node.js para la función de vista previa
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: preview/functions/package-lock.json
+
+      - name: Probar el menú privado y el regreso después del ingreso
+        run: |
+          npm ci --engine-strict --prefix preview/functions
+          npm run test:vista:ui
+
       - name: Conservar reporte y resultados de Playwright
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

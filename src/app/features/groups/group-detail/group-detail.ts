@@ -15,8 +15,8 @@ import { NavigationContext } from '../../../core/navigation-context';
   template: `
     <nav class="breadcrumbs" aria-label="Ruta de navegación">
       <a routerLink="/inicio" [queryParams]="nav.query()">Inicio</a><span>/</span
-      ><a routerLink="/grupos" [queryParams]="nav.query()">Grupos</a
-      ><span aria-hidden="true">/</span>Detalle
+      ><a routerLink="/grupos" [queryParams]="nav.query()">Grupos y asignaturas</a
+      ><span aria-hidden="true">/</span>{{ group()?.name ?? 'Detalle de grupo' }}
     </nav>
     <a mat-button routerLink="/grupos" [queryParams]="nav.query()"
       ><app-ui-icon name="arrowLeft" /> Volver al listado de grupos</a

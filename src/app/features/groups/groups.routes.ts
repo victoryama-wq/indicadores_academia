@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 export const GROUP_ROUTES: Routes = [
   {
     path: '',
-    title: 'Grupos · Academia',
+    title: 'Grupos y asignaturas · Academia',
     loadComponent: () => import('./groups/groups').then((m) => m.Groups),
   },
   {

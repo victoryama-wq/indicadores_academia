@@ -64,8 +64,11 @@ export function previewGateway({ auth, origin, systemsUid, directory }) {
         /* Solicitar una sesión nueva. */
       }
     }
-    if (req.accepts(['html', 'json']) === 'html' && !req.path.split('/').at(-1).includes('.'))
-      return res.redirect(302, '/ingreso.html');
+    if (req.accepts(['html', 'json']) === 'html' && !req.path.split('/').at(-1).includes('.')) {
+      const login = '/ingreso.html';
+      if (req.path === '/') return res.redirect(302, login);
+      return res.redirect(302, login + '?continuar=' + encodeURIComponent(req.originalUrl));
+    }
     return res.sendStatus(401);
   });
   app.use((req, res, next) => {
