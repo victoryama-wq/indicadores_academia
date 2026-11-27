@@ -1,6 +1,12 @@
 # Indicadores de Academia · Tec Playa
 
-Primera demo local, creada desde cero con Angular 21, TypeScript, Angular Material y Tailwind CSS 4. Datos ficticios en memoria y perfiles simulados. Proyecto independiente del sistema de seguimiento académico en producción.
+Aplicación de Tec Playa para consultar entregas y calificaciones por grupo, asignatura y docente. La vista privada de Coordinación está publicada en Firebase y utiliza datos simulados. Sistemas accede con su cuenta institucional de Google. La demo local incluye además el selector de perfiles y la administración de insumos. [Abrir la vista privada](https://indicadores-academia.web.app/reportes)
+
+## Cómo retomar el proyecto
+
+1. Lee el [estado actual](docs/ESTADO-ACTUAL.md) para identificar la última implementación, la publicación confirmada y la siguiente acción.
+2. Sigue el [protocolo de Codex](AGENTS.md) para comprobar la rama, los cambios locales y los PR antes de editar.
+3. Para investigar un cambio, abre el PR y la ejecución de CI enlazados en el estado. Para publicar o recuperar la vista, consulta la [guía de Firebase](docs/VISTA-FIREBASE.md).
 
 ## Ejecutar en Windows / PowerShell
 
@@ -21,24 +27,23 @@ npm run test:dependencies
 npm run test:e2e
 ```
 
-Las pruebas E2E utilizan Microsoft Edge instalado (`channel: msedge`) y arrancan el servidor cuando es necesario. `npx playwright show-report` abre el reporte local. La compilación se genera en `dist/indicadores-academia-demo/browser`. Una futura configuración de alojamiento deberá resolver las rutas Angular hacia `index.html`; no se ha configurado ni publicado alojamiento.
+Las pruebas E2E utilizan Microsoft Edge instalado (`channel: msedge`) y arrancan el servidor cuando es necesario. `npx playwright show-report` abre el reporte local. La compilación se genera en `dist/indicadores-academia-demo/browser`. La compilación privada se genera con `npm run build:vista` en `preview/functions/app/browser` y la sirve `vistaAcademia` después de comprobar la sesión.
 
 ## Integración continua
 
-El workflow [CI](.github/workflows/ci.yml) ejecuta el trabajo **Validación Angular** en pull requests dirigidos a `main`, pushes a `main` y ejecución manual desde Actions (cuando el workflow esté en la rama predeterminada). Usa Ubuntu 24.04, Node 24.14.1, caché de npm basada en `package-lock.json` y permisos `contents: read`. Ejecuta, en pasos separados y en este orden: `npm ci`, `npm run build`, `npm test`, `npm run test:dependencies` y `npm run test:moodle`. Valida instalación, compilación, datos ficticios y compatibilidad de dependencias, sin credenciales de Firebase ni Moodle.
+GitHub Actions ejecuta dos trabajos en los PR dirigidos a `main` y en los cambios integrados a esa rama. Los comandos, versiones de Node y disparadores se mantienen en el [workflow de CI](.github/workflows/ci.yml).
 
-El job independiente **E2E Edge** usa Ubuntu 24.04, Node 24.14.1 y caché por el mismo lockfile. Ejecuta `npm ci`, `npx playwright install --with-deps msedge` y `npm run test:e2e` en modo headless. Playwright inicia y espera su propio servidor local en CI; fuera de CI puede reutilizar uno existente. El recorrido comprueba seis pendientes (cuatro vencidos y dos en plazo) en siete anchos de pantalla. Los estados están precargados al corte ficticio y no dependen del día de ejecución. La suite también valida el módulo docente: totales por responsable, filtros, navegación, recarga, estados vacíos/incompletos/error y accesibilidad en escritorio y móvil.
+- **Validación Angular** compila la demo y la vista privada, ejecuta las pruebas unitarias, comprueba las dependencias y prueba el lector Moodle y el acceso a la vista con datos e identidades ficticios.
+- **E2E Edge** recorre la demo, el piloto local y la vista privada en navegador. Incluye la navegación por grupos y docentes y el regreso al destino tras el ingreso. El reporte y los resultados de Playwright se conservan como artefactos durante siete días.
 
-El artefacto `playwright-edge` conserva `playwright-report/` y `test-results/` durante 7 días, también si fallan las pruebas (salvo cancelación de la ejecución). Incluye capturas del recorrido en el reporte HTML y trazas/capturas ante fallos; las capturas históricas de `docs/evidencia/` no se sobrescriben. Los fallos de pruebas hacen fallar el job. Ambos trabajos validan únicamente datos ficticios y servicios locales, sin acceso a Moodle ni Firebase de producción.
-
-**Validación Angular** conserva su nombre y sigue siendo obligatoria para `main`. **E2E Edge** se evaluará como comprobación obligatoria después de demostrar su funcionamiento en GitHub. Este cambio no modifica el ruleset ni publica la demo.
+La comprobación obligatoria de la rama es **Validación Angular**. Las publicaciones confirmadas y sus pruebas en el dominio se registran en el [estado actual](docs/ESTADO-ACTUAL.md).
 
 ## Recorrido
 
 | Ruta                                | Resultado                                                                      |
 | ----------------------------------- | ------------------------------------------------------------------------------ |
 | `/inicio`                           | Periodo, corte, filtros, indicadores y acceso al grupo                         |
-| `/grupos`                           | Grupos de la selección                                                         |
+| `/grupos`                           | Grupos y asignaturas de la selección                                                         |
 | `/grupos/g01`                       | ENF-301, asignatura y docente                                                  |
 | `/asignaturas/i01`                  | Enfermería Clínica, clave visible ENF-304, actividad                           |
 | `/actividades/a01`                  | Plan de cuidados, resumen y registros                                          |
@@ -49,7 +54,7 @@ El artefacto `playwright-edge` conserva `playwright-report/` y `test-results/` d
 | `/seguimiento/r023`                 | Ficha individual de un pendiente en plazo                                      |
 | `/seguimiento/r001`                 | Registro calificado con cero; no se trata como dato vacío                      |
 | `/reportes`                         | Tres consultas por ciclo, conteos de personas/entregas, pesos y calendario     |
-| `/admin/insumos`                    | Sistemas: cargas ficticias con vista previa, validación y activación por ciclo |
+| `/admin/insumos`                    | Demo local de Sistemas: cargas ficticias con vista previa, validación y activación por ciclo |
 
 Desde Inicio: **Ver grupos y asignaturas → Abrir asignatura → Abrir actividad → 6 pendientes de calificar → Ver ficha**. La selección de una cifra limpia la búsqueda de estudiantes para que el detalle explique exactamente esa cifra. La búsqueda de estudiantes se conserva por actividad, sin afectar las consultas de otros docentes. La búsqueda, el orden y la página se recuperan al volver de la ficha.
 
@@ -81,7 +86,7 @@ Reportes reúne 62 estudiantes ficticios y 78 pares estudiante–actividad en 27
 
 Contrato JSON, muestras, reglas propuestas por validar con Academia, límites del perfil simulado y recorrido: [Reportes e insumos demo](docs/REPORTES-INSUMOS-DEMO.md). Las pruebas unitarias y E2E cubren conteos, filtros, ciclos, activación válida/inválida, recarga, perfiles, teclado y móvil, incluidos los instantes límite de entrega y corte. La suite utiliza el workflow existente: la validación local en Windows se distingue de los jobs ejecutados en Ubuntu al abrir el PR. Publicar la rama no despliega la demo.
 
-## Perfiles y estados de prueba
+## Perfiles y estados de prueba de la demo local
 
 El selector superior cambia entre Coordinación, Dirección y Sistemas. Coordinación consulta y abre una vista previa de exportación sin descarga. Dirección recorre las mismas consultas sin exportación (D08 pendiente). Sistemas añade un menú administrativo separado: **Insumos por ciclo** es funcional con archivos ficticios; las demás pantallas siguen como Próximamente. Acceder directamente a `/admin/insumos` o `/admin/catalogos` desde otros perfiles muestra Acceso restringido. Estas restricciones de demostración no son seguridad de servidor ni autenticación real.
 
@@ -110,20 +115,20 @@ Ver [contrato, ejemplos y recorrido](docs/IMPORTACION-CALENDARIO-27-2.md).
 - `src/app/shared/`: filtros Material, indicadores, tabla/paginación/orden, diálogo de vista previa.
 - `src/styles.scss`: tema institucional común y adaptación responsiva; `src/tailwind.css`: Tailwind 4. Inter y recursos se sirven localmente.
 
-Un adaptador Firebase posterior implementará el contrato y validará ámbito en servidor. La ampliación local usa supuestos explícitos, no reglas institucionales definitivas. El catálogo y los registros del adaptador remoto deberán venir autorizados por ámbito; los filtros de cliente no son controles de seguridad. La demo filtra y pagina en memoria sus 42 registros ficticios.
+La futura integración de datos académicos requiere un adaptador que valide el ámbito en el servidor. La ampliación local usa supuestos explícitos, no reglas institucionales definitivas. El catálogo y los registros del adaptador remoto deberán venir autorizados por ámbito; los filtros de cliente no son controles de seguridad. La demo filtra y pagina en memoria sus 42 registros ficticios.
 
 ## Referencias, verificación y siguientes etapas
 
-La correspondencia de todos los diseños Stitch, sus discrepancias y los criterios de las vistas faltantes se documentan en [docs/REFERENCIAS.md](docs/REFERENCIAS.md). Las verificaciones de entrega están en [docs/VERIFICACION.md](docs/VERIFICACION.md); las capturas, en `docs/evidencia/`.
+La correspondencia de todos los diseños Stitch, sus discrepancias y los criterios de las vistas faltantes se documentan en [docs/REFERENCIAS.md](docs/REFERENCIAS.md). Las verificaciones históricas de la demo local están en [docs/VERIFICACION.md](docs/VERIFICACION.md); las capturas, en `docs/evidencia/`.
 
 Los ajustes de dependencias transitivas, sus pruebas de compatibilidad y la reducción de carga inicial se explican en [docs/MANTENIMIENTO-DEPENDENCIAS.md](docs/MANTENIMIENTO-DEPENDENCIAS.md). Mantener los overrides bajo revisión al actualizar Angular CLI.
 
 El refactor visual, las skills locales aplicadas y la instalación de `angular/skills` se documentan en [docs/REFACTOR-UI-SKILLS.md](docs/REFACTOR-UI-SKILLS.md). Incluye mejoras de accesibilidad, tablas móviles, iconografía local y evidencia de que los contratos y dependencias de la demo permanecen intactos.
 
-Próximamente: reportes institucionales definitivos y descarga, formatos reales de insumos, históricos, calidad de información y demás formularios administrativos. Autenticación real, permisos de backend/Rules, Firebase, acceso Moodle multicurso y publicación pertenecen a otras etapas. La demo no se ha desplegado.
+Quedan por desarrollar los reportes institucionales definitivos y su descarga, los históricos, la calidad de información y la integración de datos reales por ámbito. La revisión funcional de las vistas con Academia se sigue en el [estado actual](docs/ESTADO-ACTUAL.md).
 
 ## Piloto local de lectura Moodle
 
 Sistemas activa las imparticiones de SPAI desde Insumos por ciclo, revisa las coincidencias con el catálogo Moodle y abre una asignatura vinculada para consultar sus tareas e indicadores. La [guía de arranque y verificación](docs/MOODLE-LECTURA-PILOTO.md) incluye las instrucciones para PowerShell y el alcance de la población.
 
-La [guía de la vista de Coordinación para Sistemas](docs/VISTA-FIREBASE.md) describe las pruebas locales, el reemplazo previsto de Seguimiento académico en `indicadores-academia.web.app` y la restauración de su versión anterior.
+La [guía de la vista de Coordinación para Sistemas](docs/VISTA-FIREBASE.md) describe las pruebas locales, la publicación en `indicadores-academia.web.app` y la restauración de una versión anterior.
