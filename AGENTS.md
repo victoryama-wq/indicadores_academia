@@ -1,3 +1,19 @@
+# Instrucciones para trabajar en Indicadores de Academia
+
+## Al iniciar una tarea
+
+1. Lee el [README](README.md) y el [estado actual](docs/ESTADO-ACTUAL.md). Identifica el entregable solicitado, el último hito y la siguiente acción registrada.
+2. En una copia local, consulta `git status --short --branch` y `git log -1 --oneline --decorate`. Comprueba el remoto y la rama de destino. Actualiza las referencias remotas con `git fetch` cuando esté disponible el remoto. Si trabajas directamente en GitHub, consulta la referencia y el PR de la rama allí.
+3. Contrasta el registro con los PR abiertos, sus commits y las comprobaciones del SHA que vas a retomar. Conserva los cambios locales de otras tareas y reutiliza la rama correspondiente cuando exista. Si las fuentes discrepan, identifica la última evidencia fechada para cada entorno.
+4. Abre la guía específica del área que vas a modificar. El [procedimiento de Firebase](docs/VISTA-FIREBASE.md) aplica cuando la tarea incluye publicación o recuperación.
+
+## Al cerrar o pausar una tarea
+
+1. Revisa el diff contra el alcance solicitado y comprueba los archivos pendientes. Ejecuta las verificaciones correspondientes al cambio. Registra qué pasó, qué falló y qué quedó pendiente, con el comando o enlace de CI del SHA comprobado.
+2. Identifica dónde quedó el trabajo: copia local, rama y PR, o integración en `main`. Si queda en curso, anota la rama, el último commit disponible, cualquier cambio pendiente de guardar y el primer paso para continuar. Si es exclusivamente local, indica en qué copia se encuentra.
+3. Actualiza el [estado actual](docs/ESTADO-ACTUAL.md) cuando cambie un hito, una decisión, un bloqueo, el despliegue o el siguiente paso. Enlaza el PR para seguir las comprobaciones y el merge posteriores al commit. Un cambio documental puede avanzar `main` mientras el SHA publicado sigue siendo el del último despliegue confirmado.
+4. Para una publicación incluida en la tarea, registra la fecha y hora de Cancún, el SHA de la aplicación, los recursos publicados, su versión o revisión y el resultado del recorrido en el dominio. Distingue la comprobación técnica del visto bueno de Academia e identifica quién confirmó cada uno. Usa identificadores de revisión y datos de prueba en la evidencia. Mantén credenciales y archivos institucionales fuera del repositorio.
+5. Actualiza el README si cambió el uso o arranque, esta guía si cambió el procedimiento y la documentación del módulo si cambió su contrato. Cierra con el resultado verificable, los enlaces y la siguiente acción con su responsable. Si la tarea fue de consulta y el proyecto sigue en el mismo punto, basta el resumen en la respuesta.
 
 You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
 
